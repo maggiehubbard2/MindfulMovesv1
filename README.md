@@ -1,50 +1,51 @@
-# Welcome to your Expo app 👋
+# 🌱 MindfulMoves – Habit Tracker App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**MindfulMoves** is a beautifully simple habit tracker designed to help you become the best version of yourself — one habit at a time. Whether you’re leveling up your fitness, routines, or mindset, this app makes it easier to build systems that stick. ✨
 
-## Get started
+---
 
-1. Install dependencies
+### ✨ Inspiration
 
-   ```bash
-   npm install
-   ```
+> “You don’t rise to the level of your goals. You fall to the level of your systems.”  
+> — *James Clear, Atomic Habits*
 
-2. Start the app
+Being made with love by [@ItGirlMaggie](https://instagram.com/ItGirlMaggie) 💖
 
-   ```bash
-   npx expo start
-   ```
 
-In the output, you'll find options to open the app in a
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 📱 Features to Look Forward To
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+- ✅ Check off daily habits with a sleek checklist
+- 📆 Visual calendar to track consistency 
+- 🔄 Habit streaks to stay motivated _(coming soon)_
+- 🧘🏽‍♀️ Custom habit creation for your personal goals _(coming soon)_
+- 🌙 Dark mode for night owls _(coming soon)_
+- 🔔 Daily reminders _(coming soon)_
 
-## Get a fresh project
+---
 
-When you're ready, run:
+## 🛠 Built With
+
+- [React Native](https://reactnative.dev/)
+- [Expo](https://expo.dev/)
+- [React Navigation](https://reactnavigation.org/)
+- [AsyncStorage](https://react-native-async-storage.github.io/async-storage/) for offline habit tracking
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (v16 or higher)
+- [Expo CLI](https://docs.expo.dev/get-started/installation/)
+- iOS Simulator (Xcode) or Android Emulator (Android Studio)
+
+
+### Installation
 
 ```bash
-npm run reset-project
-```
+git clone https://github.com/your-username/mindfulmoves.git
+cd mindfulmoves
+npm install
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
