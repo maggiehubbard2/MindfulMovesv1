@@ -1,93 +1,101 @@
+import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Keyboard, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import EmojiPicker from './EmojiPicker';
+import { ThemedText } from './ThemedText';
 
-const COMMON_EMOJIS = ['🏃', '💧', '📚', '🧘', '🎯', '🎨', '🎵', '🌱', '💪', '🧠', '😴', '🥗'];
 
 interface AddHabitProps {
   onAddHabit: (name: string, emoji: string) => void;
 }
 
 export default function AddHabit({ onAddHabit }: AddHabitProps) {
-  const [newHabitName, setNewHabitName] = useState('');
-  const [selectedEmoji, setSelectedEmoji] = useState(COMMON_EMOJIS[0]);
-  const [errorMessage, setErrorMessage] = useState('');
+  const { colors } = useTheme();
+  const [habitName, setHabitName] = useState('');
+  const [selectedEmoji, setSelectedEmoji] = useState('🎯');
+  const [isEmojiPickerVisible, setIsEmojiPickerVisible] = useState(false);
 
   const handleAddHabit = () => {
-    if (newHabitName.trim()) {
-      onAddHabit(newHabitName.trim(), selectedEmoji);
-      setNewHabitName('');
-      router.back();
-    } else {
-      setErrorMessage('Please enter a habit name');
+    if (habitName.trim()) {
+      onAddHabit(habitName.trim(), selectedEmoji);
+      setHabitName('');
+      Keyboard.dismiss();
     }
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.container, { backgroundColor: colors.card }]}>
+      <SafeAreaView style={styles.safeArea}>  
       <StatusBar style="auto" />
       <View style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#007AFF" />
           </TouchableOpacity>
-          <Text style={styles.title}>Add New Habit</Text>
+          <ThemedText style={styles.title}>Add New Habit</ThemedText>
         </View>
-
         <View style={styles.inputContainer}>
+          <TouchableOpacity
+            style={[styles.emojiButton, { backgroundColor: colors.background }]}
+            onPress={() => setIsEmojiPickerVisible(true)}
+          >
+            <ThemedText style={styles.emoji}>{selectedEmoji}</ThemedText>
+          </TouchableOpacity>
           <TextInput
-            style={[styles.input, errorMessage ? styles.inputError : null]}
-            value={newHabitName}
-            onChangeText={(text) => {
-              setNewHabitName(text);
-              if (errorMessage) setErrorMessage('');
-            }}
-            placeholder="Enter habit name..."
-            placeholderTextColor="#666"
-            autoFocus
+            style={[styles.input, { 
+              backgroundColor: colors.background,
+              color: colors.text,
+              borderColor: colors.border,
+            }]}
+            placeholder="Add a new habit..."
+            placeholderTextColor={colors.text}
+            value={habitName}
+            onChangeText={setHabitName}
+            onSubmitEditing={handleAddHabit}
+            returnKeyType="done"
           />
-          {errorMessage ? (
-            <Text style={styles.errorText}>{errorMessage}</Text>
-          ) : null}
+          <TouchableOpacity
+            style={[styles.addButton, { 
+              backgroundColor: habitName.trim() ? colors.primary : colors.border,
+              opacity: habitName.trim() ? 1 : 0.5,
+            }]}
+            onPress={handleAddHabit}
+            disabled={!habitName.trim()}
+          >
+            <ThemedText style={styles.addButtonText}>Add</ThemedText>
+          </TouchableOpacity>
         </View>
-
-        <View style={styles.emojiSection}>
-          <Text style={styles.emojiTitle}>Choose an emoji:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.emojiList}>
-            {COMMON_EMOJIS.map((emoji) => (
-              <TouchableOpacity
-                key={emoji}
-                style={[
-                  styles.emojiButton,
-                  selectedEmoji === emoji && styles.selectedEmojiButton,
-                ]}
-                onPress={() => setSelectedEmoji(emoji)}
-              >
-                <Text style={styles.emoji}>{emoji}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        <TouchableOpacity style={styles.addButton} onPress={handleAddHabit}>
-          <Ionicons name="add" size={24} color="white" />
-          <Text style={styles.addButtonText}>Add Habit</Text>
-        </TouchableOpacity>
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+      <EmojiPicker
+        visible={isEmojiPickerVisible}
+        onClose={() => setIsEmojiPickerVisible(false)}
+        onSelect={(emoji) => setSelectedEmoji(emoji)}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  container: {
-    flex: 1,
-    padding: 16,
   },
   header: {
     flexDirection: 'row',
@@ -99,69 +107,66 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
   },
   inputContainer: {
-    marginBottom: 24,
-  },
-  input: {
-    height: 48,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    fontSize: 16,
-  },
-  inputError: {
-    borderWidth: 1,
-    borderColor: '#ff4444',
-  },
-  errorText: {
-    color: '#ff4444',
-    fontSize: 14,
-    marginTop: 8,
-    marginLeft: 4,
-  },
-  emojiSection: {
-    marginBottom: 24,
-  },
-  emojiTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  emojiList: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   emojiButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'white',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
-  },
-  selectedEmojiButton: {
-    backgroundColor: '#007AFF',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   emoji: {
-    fontSize: 24,
+    fontSize: 22,
+  },
+  input: {
+    flex: 1,
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    height: 44,
+    paddingHorizontal: 20,
+    borderRadius: 12,
     justifyContent: 'center',
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 8,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   addButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 8,
   },
-}); 
+});

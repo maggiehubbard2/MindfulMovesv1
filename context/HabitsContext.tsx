@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
 interface Habit {
   id: string;
@@ -26,21 +27,49 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   const [showEmojis, setShowEmojis] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
+  // Load habits from storage when the app starts
+  useEffect(() => {
+    loadHabits();
+  }, []);
+
+  const loadHabits = async () => {
+    try {
+      const savedHabits = await AsyncStorage.getItem('habits');
+      const savedShowEmojis = await AsyncStorage.getItem('showEmojis');
+      if (savedHabits) {
+        setHabits(JSON.parse(savedHabits));
+      }
+      if (savedShowEmojis) {
+        setShowEmojis(JSON.parse(savedShowEmojis));
+      }
+    } catch (error) {
+      console.error('Error loading habits:', error);
+    }
+  };
+
+  const saveHabits = async (newHabits: Habit[]) => {
+    try {
+      await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
+    } catch (error) {
+      console.error('Error saving habits:', error);
+    }
+  };
+
   const addHabit = (name: string, emoji: string) => {
-    setHabits([
-      ...habits,
-      {
-        id: Date.now().toString(),
-        name,
-        streak: 0,
-        completedToday: false,
-        emoji,
-      },
-    ]);
+    const newHabit: Habit = {
+      id: Date.now().toString(),
+      name,
+      streak: 0,
+      completedToday: false,
+      emoji,
+    };
+    const newHabits = [...habits, newHabit];
+    setHabits(newHabits);
+    saveHabits(newHabits);
   };
 
   const toggleHabit = (id: string) => {
-    setHabits(habits.map(habit => {
+    const newHabits = habits.map((habit) => {
       if (habit.id === id) {
         const completedToday = !habit.completedToday;
         return {
@@ -50,15 +79,25 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         };
       }
       return habit;
-    }));
+    });
+    setHabits(newHabits);
+    saveHabits(newHabits);
   };
 
   const removeHabit = (id: string) => {
-    setHabits(habits.filter(habit => habit.id !== id));
+    const newHabits = habits.filter((habit) => habit.id !== id);
+    setHabits(newHabits);
+    saveHabits(newHabits);
   };
 
-  const toggleEmojis = () => {
-    setShowEmojis(!showEmojis);
+  const toggleEmojis = async () => {
+    const newShowEmojis = !showEmojis;
+    setShowEmojis(newShowEmojis);
+    try {
+      await AsyncStorage.setItem('showEmojis', JSON.stringify(newShowEmojis));
+    } catch (error) {
+      console.error('Error saving emoji preference:', error);
+    }
   };
 
   const toggleDarkMode = () => {
