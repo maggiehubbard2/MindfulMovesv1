@@ -10,7 +10,7 @@ export default function SettingsScreen() {
 
   const accentColorOptions = [
     { name: 'Blue', value: 'blue', color: '#007AFF' },
-    { name: 'Pink', value: 'pink', color: '#FF2D55' },
+    { name: 'Pink', value: 'pink', color: '#ff60ce' },
     { name: 'Green', value: 'green', color: '#34C759' },
     { name: 'Purple', value: 'purple', color: '#AF52DE' },
   ];

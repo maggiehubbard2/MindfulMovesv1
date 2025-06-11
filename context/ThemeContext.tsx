@@ -24,8 +24,8 @@ const accentColors = {
     secondary: '#5856D6',
   },
   pink: {
-    primary: '#FF2D55',
-    secondary: '#FF375F',
+    primary: '#ff2dbe',
+    secondary: '#ff60ce',
   },
   green: {
     primary: '#34C759',
