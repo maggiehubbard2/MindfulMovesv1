@@ -7,6 +7,7 @@ interface Habit {
   streak: number;
   completedToday: boolean;
   emoji: string;
+  lastCompletedDate: string | null; // ISO string of the last completion date
 }
 
 interface HabitsContextType {
@@ -31,6 +32,50 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     loadHabits();
   }, []);
+
+  // Check and update streaks daily
+  useEffect(() => {
+    const checkStreaks = () => {
+      const today = new Date().toISOString().split('T')[0];
+      const newHabits = habits.map(habit => {
+        if (!habit.lastCompletedDate) return habit;
+        
+        const lastDate = new Date(habit.lastCompletedDate);
+        const lastDateStr = lastDate.toISOString().split('T')[0];
+        
+        // If the last completion was not yesterday, reset the streak
+        if (lastDateStr !== today && !habit.completedToday) {
+          return {
+            ...habit,
+            streak: 0,
+            completedToday: false
+          };
+        }
+        return habit;
+      });
+      
+      if (JSON.stringify(newHabits) !== JSON.stringify(habits)) {
+        setHabits(newHabits);
+        saveHabits(newHabits);
+      }
+    };
+
+    // Check streaks when the app starts
+    checkStreaks();
+
+    // Set up daily check at midnight
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const timeUntilMidnight = tomorrow.getTime() - now.getTime();
+
+    const timer = setTimeout(() => {
+      checkStreaks();
+      // Set up recurring daily check
+      setInterval(checkStreaks, 24 * 60 * 60 * 1000);
+    }, timeUntilMidnight);
+
+    return () => clearTimeout(timer);
+  }, [habits]);
 
   const loadHabits = async () => {
     try {
@@ -62,6 +107,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       streak: 0,
       completedToday: false,
       emoji,
+      lastCompletedDate: null,
     };
     const newHabits = [...habits, newHabit];
     setHabits(newHabits);
@@ -69,13 +115,29 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleHabit = (id: string) => {
+    const today = new Date().toISOString().split('T')[0];
     const newHabits = habits.map((habit) => {
       if (habit.id === id) {
         const completedToday = !habit.completedToday;
+        const lastDate = habit.lastCompletedDate ? new Date(habit.lastCompletedDate) : null;
+        const lastDateStr = lastDate ? lastDate.toISOString().split('T')[0] : null;
+        
+        let newStreak = habit.streak;
+        if (completedToday) {
+          // If this is the first completion or the last completion was yesterday
+          if (!lastDateStr || lastDateStr === today) {
+            newStreak = habit.streak + 1;
+          }
+        } else {
+          // If unchecking today's completion, decrement streak
+          newStreak = Math.max(0, habit.streak - 1);
+        }
+
         return {
           ...habit,
           completedToday,
-          streak: completedToday ? habit.streak + 1 : habit.streak,
+          streak: newStreak,
+          lastCompletedDate: completedToday ? today : habit.lastCompletedDate,
         };
       }
       return habit;

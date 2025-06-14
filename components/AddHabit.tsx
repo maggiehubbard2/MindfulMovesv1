@@ -1,5 +1,4 @@
 import { useTheme } from '@/context/ThemeContext';
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
@@ -8,13 +7,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import EmojiPicker from './EmojiPicker';
 import { ThemedText } from './ThemedText';
 
-
 interface AddHabitProps {
   onAddHabit: (name: string, emoji: string) => void;
 }
 
 export default function AddHabit({ onAddHabit }: AddHabitProps) {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const [habitName, setHabitName] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🎯');
   const [isEmojiPickerVisible, setIsEmojiPickerVisible] = useState(false);
@@ -24,30 +22,24 @@ export default function AddHabit({ onAddHabit }: AddHabitProps) {
       onAddHabit(habitName.trim(), selectedEmoji);
       setHabitName('');
       Keyboard.dismiss();
+      router.back();
     }
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.card }]}>
-      <SafeAreaView style={styles.safeArea}>  
-      <StatusBar style="auto" />
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#007AFF" />
-          </TouchableOpacity>
-          <ThemedText style={styles.title}>Add New Habit</ThemedText>
-        </View>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
+      <View style={styles.content}>
         <View style={styles.inputContainer}>
           <TouchableOpacity
-            style={[styles.emojiButton, { backgroundColor: colors.background }]}
+            style={[styles.emojiButton, { backgroundColor: colors.card }]}
             onPress={() => setIsEmojiPickerVisible(true)}
           >
             <ThemedText style={styles.emoji}>{selectedEmoji}</ThemedText>
           </TouchableOpacity>
           <TextInput
             style={[styles.input, { 
-              backgroundColor: colors.background,
+              backgroundColor: colors.card,
               color: colors.text,
               borderColor: colors.border,
             }]}
@@ -70,45 +62,22 @@ export default function AddHabit({ onAddHabit }: AddHabitProps) {
           </TouchableOpacity>
         </View>
       </View>
-      </SafeAreaView>
       <EmojiPicker
         visible={isEmojiPickerVisible}
         onClose={() => setIsEmojiPickerVisible(false)}
         onSelect={(emoji) => setSelectedEmoji(emoji)}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  safeArea: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  backButton: {
-    padding: 8,
-    marginRight: 8,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  content: {
+    flex: 1,
+    padding: 16,
   },
   inputContainer: {
     flexDirection: 'row',

@@ -1,21 +1,32 @@
 import AddHabit from '@/components/AddHabit';
+import Quote from '@/components/Quote';
 import { useHabits } from '@/context/HabitsContext';
-import { StyleSheet } from 'react-native';
+import { getRandomQuote } from '@/utils/quoteUtils';
+import React from 'react';
+import { StyleSheet, View } from 'react-native';
+
+function AddScreenContent() {
+  const { addHabit } = useHabits();
+  const quote = getRandomQuote();
+
+  return (
+    <View style={styles.container}>
+      <Quote text={quote.text} author={quote.author} style={styles.quote} />
+      <AddHabit onAddHabit={addHabit} />
+    </View>
+  );
+}
 
 export default function AddScreen() {
-  const { addHabit } = useHabits();
-  return <AddHabit onAddHabit={addHabit} />;
+  return <AddScreenContent />;
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
   },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  quote: {
+    marginHorizontal: 16,
+    marginTop: 16,
   },
 });

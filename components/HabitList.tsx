@@ -45,6 +45,8 @@ export default function HabitList({ habits, showEmojis, onToggleHabit, onRemoveH
         <Text style={[styles.emptyText, { color: colors.text }]}>
           No habits yet. Add your first habit!
         </Text>
+        <View style={{ height: 20 }} />
+
         <Link href="/add" asChild>
           <TouchableOpacity style={styles.addFirstButton}>
             <Ionicons name="add" size={24} color="white" />
