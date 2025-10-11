@@ -1,18 +1,18 @@
-import AddHabit from '@/components/AddHabit';
+import AddTask from '@/components/AddTask';
 import Quote from '@/components/Quote';
-import { useHabits } from '@/context/HabitsContext';
+import { useTasks } from '@/context/TasksContext';
 import { getRandomQuote } from '@/utils/quoteUtils';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
 function AddScreenContent() {
-  const { addHabit } = useHabits();
+  const { addTask } = useTasks();
   const quote = getRandomQuote();
 
   return (
     <View style={styles.container}>
       <Quote text={quote.text} author={quote.author} style={styles.quote} />
-      <AddHabit onAddHabit={addHabit} />
+      <AddTask onAddTask={addTask} />
     </View>
   );
 }

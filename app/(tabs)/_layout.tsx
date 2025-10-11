@@ -1,7 +1,8 @@
+import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
-import React from 'react';
-import { Platform } from 'react-native';
+import { router, Tabs } from 'expo-router';
+import React, { useEffect } from 'react';
+import { ActivityIndicator, Platform, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 
 import { HapticTab } from '@/components/HapticTab';
@@ -11,7 +12,26 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function TabLayout() {
   const { colors } = useTheme();
+  const { user, loading } = useAuth();
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [user, loading]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (!user) {
+    return null; // Will redirect to login
+  }
 
   return (
     <Tabs
@@ -39,7 +59,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Habits',
+          title: 'Tasks',
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="list" size={size} color={color} />
@@ -49,9 +69,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="add"
         options={{
-          title: 'Add Habit',
+          title: 'Add Task',
           headerShown: true,
-          headerTitle: 'Add New Habit',
+          headerTitle: 'Add New Task',
           headerStyle: {
             backgroundColor: colors.card,
           },
@@ -64,7 +84,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="manager"
         options={{
-          title: 'Habit Manager',
+          title: 'Task Manager',
           headerShown: false,
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="checkmark.circle" color={color} />,
         }}

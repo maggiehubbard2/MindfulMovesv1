@@ -7,20 +7,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import EmojiPicker from './EmojiPicker';
 import { ThemedText } from './ThemedText';
 
-interface AddHabitProps {
-  onAddHabit: (name: string, emoji: string) => void;
+interface AddTaskProps {
+  onAddTask: (name: string, emoji: string) => void;
 }
 
-export default function AddHabit({ onAddHabit }: AddHabitProps) {
+export default function AddTask({ onAddTask }: AddTaskProps) {
   const { colors, isDarkMode } = useTheme();
-  const [habitName, setHabitName] = useState('');
+  const [taskName, setTaskName] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🎯');
   const [isEmojiPickerVisible, setIsEmojiPickerVisible] = useState(false);
 
-  const handleAddHabit = () => {
-    if (habitName.trim()) {
-      onAddHabit(habitName.trim(), selectedEmoji);
-      setHabitName('');
+  const handleAddTask = () => {
+    if (taskName.trim()) {
+      onAddTask(taskName.trim(), selectedEmoji);
+      setTaskName('');
       Keyboard.dismiss();
       router.back();
     }
@@ -37,26 +37,26 @@ export default function AddHabit({ onAddHabit }: AddHabitProps) {
           >
             <ThemedText style={styles.emoji}>{selectedEmoji}</ThemedText>
           </TouchableOpacity>
-          <TextInput
-            style={[styles.input, { 
-              backgroundColor: colors.card,
-              color: colors.text,
-              borderColor: colors.border,
-            }]}
-            placeholder="Add a new habit..."
-            placeholderTextColor={colors.text}
-            value={habitName}
-            onChangeText={setHabitName}
-            onSubmitEditing={handleAddHabit}
-            returnKeyType="done"
-          />
+            <TextInput
+              style={[styles.input, { 
+                backgroundColor: colors.card,
+                color: colors.text,
+                borderColor: colors.border,
+              }]}
+              placeholder="Add a new task..."
+              placeholderTextColor={colors.text}
+              value={taskName}
+              onChangeText={setTaskName}
+              onSubmitEditing={handleAddTask}
+              returnKeyType="done"
+            />
           <TouchableOpacity
             style={[styles.addButton, { 
-              backgroundColor: habitName.trim() ? colors.primary : colors.border,
-              opacity: habitName.trim() ? 1 : 0.5,
+              backgroundColor: taskName.trim() ? colors.primary : colors.border,
+              opacity: taskName.trim() ? 1 : 0.5,
             }]}
-            onPress={handleAddHabit}
-            disabled={!habitName.trim()}
+            onPress={handleAddTask}
+            disabled={!taskName.trim()}
           >
             <ThemedText style={styles.addButtonText}>Add</ThemedText>
           </TouchableOpacity>
