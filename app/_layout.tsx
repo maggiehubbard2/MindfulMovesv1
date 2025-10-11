@@ -1,4 +1,6 @@
+import '@/config/firebase'; // Initialize Firebase
 import { HabitsProvider } from '@/context/HabitsContext';
+import { AuthProvider } from '@/context/AuthContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { Stack } from 'expo-router';
 
@@ -30,9 +32,11 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <ThemeProvider>
-      <HabitsProvider>
-        <RootLayoutNav />
-      </HabitsProvider>
+      <AuthProvider>
+        <HabitsProvider>
+          <RootLayoutNav />
+        </HabitsProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }
