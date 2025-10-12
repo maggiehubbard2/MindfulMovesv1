@@ -1,191 +1,178 @@
+import { db } from '@/config/firebase';
+import { useAuth } from '@/context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-interface Task {
+interface Habit {
   id: string;
   name: string;
-  streak: number;
-  completedToday: boolean;
+  description?: string;
+  targetDate?: string;
+  completed: boolean;
   emoji: string;
-  lastCompletedDate: string | null; // ISO string of the last completion date
+  userId: string;
+  createdAt: Date;
+  completedAt?: Date;
 }
 
-interface TasksContextType {
-  tasks: Task[];
-  showEmojis: boolean;
-  isDarkMode: boolean;
-  addTask: (name: string, emoji: string) => void;
-  toggleTask: (id: string) => void;
-  removeTask: (id: string) => void;
-  toggleEmojis: () => void;
-  toggleDarkMode: () => void;
+interface HabitsContextType {
+  habits: Habit[];
+  addHabit: (name: string, emoji: string, description?: string, targetDate?: string) => Promise<void>;
+  toggleHabit: (id: string) => Promise<void>;
+  removeHabit: (id: string) => Promise<void>;
 }
 
-const TasksContext = createContext<TasksContextType | undefined>(undefined);
+const HabitsContext = createContext<HabitsContextType | undefined>(undefined);
 
-export function TasksProvider({ children }: { children: React.ReactNode }) {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [showEmojis, setShowEmojis] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+export function HabitsProvider({ children }: { children: React.ReactNode }) {
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const { user } = useAuth();
 
-  // Load tasks from storage when the app starts
+  // Load habits from Firestore when user is authenticated
   useEffect(() => {
-    loadTasks();
-  }, []);
+    if (user) {
+      loadHabitsFromFirestore();
+    } else {
+      setHabits([]);
+    }
+  }, [user]);
 
-  // Check and update streaks daily
-  useEffect(() => {
-    const checkStreaks = () => {
-      const today = new Date().toISOString().split('T')[0];
-      const newTasks = tasks.map(task => {
-        if (!task.lastCompletedDate) return task;
-        
-        const lastDate = new Date(task.lastCompletedDate);
-        const lastDateStr = lastDate.toISOString().split('T')[0];
-        
-        // If the last completion was not yesterday, reset the streak
-        if (lastDateStr !== today && !task.completedToday) {
-          return {
-            ...task,
-            streak: 0,
-            completedToday: false
-          };
-        }
-        return task;
+  const loadHabitsFromFirestore = async () => {
+    if (!user) return;
+    
+    try {
+      const habitsQuery = query(
+        collection(db, 'habit'),
+        where('userId', '==', user.uid)
+      );
+      
+      const querySnapshot = await getDocs(habitsQuery);
+      const firestoreHabits: Habit[] = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name,
+          description: data.description,
+          targetDate: data.targetDate,
+          completed: data.completed || false,
+          emoji: data.emoji,
+          userId: data.userId,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          completedAt: data.completedAt?.toDate(),
+        };
       });
       
-      if (JSON.stringify(newTasks) !== JSON.stringify(tasks)) {
-        setTasks(newTasks);
-        saveTasks(newTasks);
+      setHabits(firestoreHabits);
+    } catch (error) {
+      // Fall back to local storage if Firestore fails
+      const savedHabits = await AsyncStorage.getItem('habits');
+      if (savedHabits) {
+        setHabits(JSON.parse(savedHabits));
       }
+    }
+  };
+
+  const addHabit = async (name: string, emoji: string, description?: string, targetDate?: string) => {
+    if (!user) return;
+    
+    try {
+      const habitData = {
+        name,
+        description,
+        targetDate,
+        completed: false,
+        emoji,
+        userId: user.uid,
+        createdAt: new Date(),
+      };
+      
+      // Add to Firestore
+      const docRef = await addDoc(collection(db, 'habit'), habitData);
+      
+      // Update local state
+      const newHabit: Habit = {
+        id: docRef.id,
+        ...habitData,
+      };
+      
+      setHabits([...habits, newHabit]);
+      
+      // Also save to local storage as backup
+      await AsyncStorage.setItem('habits', JSON.stringify([...habits, newHabit]));
+    } catch (error) {
+      // Fallback to local storage if Firestore fails
+      const newHabit: Habit = {
+        id: Date.now().toString(),
+        name,
+        description,
+        targetDate,
+        completed: false,
+        emoji,
+        userId: user.uid,
+        createdAt: new Date(),
+      };
+      const newHabits = [...habits, newHabit];
+      setHabits(newHabits);
+      await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
+    }
+  };
+
+  const toggleHabit = async (id: string) => {
+    const habitToUpdate = habits.find(habit => habit.id === id);
+    if (!habitToUpdate) return;
+
+    const completed = !habitToUpdate.completed;
+    const completedAt = completed ? new Date() : undefined;
+
+    const updatedHabit = {
+      ...habitToUpdate,
+      completed,
+      completedAt,
     };
 
-    // Check streaks when the app starts
-    checkStreaks();
-
-    // Set up daily check at midnight
-    const now = new Date();
-    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    const timeUntilMidnight = tomorrow.getTime() - now.getTime();
-
-    const timer = setTimeout(() => {
-      checkStreaks();
-      // Set up recurring daily check
-      setInterval(checkStreaks, 24 * 60 * 60 * 1000);
-    }, timeUntilMidnight);
-
-    return () => clearTimeout(timer);
-  }, [tasks]);
-
-  const loadTasks = async () => {
+    // Update in Firestore
     try {
-      const savedTasks = await AsyncStorage.getItem('tasks');
-      const savedShowEmojis = await AsyncStorage.getItem('showEmojis');
-      if (savedTasks) {
-        setTasks(JSON.parse(savedTasks));
-      }
-      if (savedShowEmojis) {
-        setShowEmojis(JSON.parse(savedShowEmojis));
-      }
+      await updateDoc(doc(db, 'habit', id), {
+        completed,
+        completedAt: completedAt || null,
+      });
     } catch (error) {
-      console.error('Error loading tasks:', error);
+      // Firestore update failed, continue with local update
     }
+
+    // Update local state
+    const newHabits = habits.map((habit) => habit.id === id ? updatedHabit : habit);
+    setHabits(newHabits);
+    await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
   };
 
-  const saveTasks = async (newTasks: Task[]) => {
+  const removeHabit = async (id: string) => {
     try {
-      await AsyncStorage.setItem('tasks', JSON.stringify(newTasks));
+      // Delete from Firestore
+      await deleteDoc(doc(db, 'habit', id));
     } catch (error) {
-      console.error('Error saving tasks:', error);
+      // Continue with local deletion even if Firestore fails
     }
-  };
 
-  const addTask = (name: string, emoji: string) => {
-    const newTask: Task = {
-      id: Date.now().toString(),
-      name,
-      streak: 0,
-      completedToday: false,
-      emoji,
-      lastCompletedDate: null,
-    };
-    const newTasks = [...tasks, newTask];
-    setTasks(newTasks);
-    saveTasks(newTasks);
-  };
-
-  const toggleTask = (id: string) => {
-    const today = new Date().toISOString().split('T')[0];
-    const newTasks = tasks.map((task) => {
-      if (task.id === id) {
-        const completedToday = !task.completedToday;
-        const lastDate = task.lastCompletedDate ? new Date(task.lastCompletedDate) : null;
-        const lastDateStr = lastDate ? lastDate.toISOString().split('T')[0] : null;
-        
-        let newStreak = task.streak;
-        if (completedToday) {
-          // If this is the first completion or the last completion was yesterday
-          if (!lastDateStr || lastDateStr === today) {
-            newStreak = task.streak + 1;
-          }
-        } else {
-          // If unchecking today's completion, decrement streak
-          newStreak = Math.max(0, task.streak - 1);
-        }
-
-        return {
-          ...task,
-          completedToday,
-          streak: newStreak,
-          lastCompletedDate: completedToday ? today : task.lastCompletedDate,
-        };
-      }
-      return task;
-    });
-    setTasks(newTasks);
-    saveTasks(newTasks);
-  };
-
-  const removeTask = (id: string) => {
-    const newTasks = tasks.filter((task) => task.id !== id);
-    setTasks(newTasks);
-    saveTasks(newTasks);
-  };
-
-  const toggleEmojis = async () => {
-    const newShowEmojis = !showEmojis;
-    setShowEmojis(newShowEmojis);
-    try {
-      await AsyncStorage.setItem('showEmojis', JSON.stringify(newShowEmojis));
-    } catch (error) {
-      console.error('Error saving emoji preference:', error);
-    }
-  };
-
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
+    // Update local state
+    const newHabits = habits.filter((habit) => habit.id !== id);
+    setHabits(newHabits);
+    await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
   };
 
   return (
-    <TasksContext.Provider value={{ 
-      tasks, 
-      showEmojis,
-      isDarkMode,
-      addTask, 
-      toggleTask, 
-      removeTask,
-      toggleEmojis,
-      toggleDarkMode
-    }}>
+    <HabitsContext.Provider value={{ habits, addHabit, toggleHabit, removeHabit }}>
       {children}
-    </TasksContext.Provider>
+    </HabitsContext.Provider>
   );
 }
 
-export function useTasks() {
-  const context = useContext(TasksContext);
+export function useHabits() {
+  const context = useContext(HabitsContext);
   if (context === undefined) {
-    throw new Error('useTasks must be used within a TasksProvider');
+    throw new Error('useHabits must be used within a HabitsProvider');
   }
   return context;
-} 
+}
+

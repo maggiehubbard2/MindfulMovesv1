@@ -59,7 +59,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tasks',
+          title: 'TODO',
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="list" size={size} color={color} />
@@ -78,6 +78,42 @@ export default function TabLayout() {
           headerTintColor: colors.primary,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="add-circle" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="habits"
+        options={{
+          title: 'Habits',
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="repeat-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="addhabit"
+        options={{
+          title: 'Add Habit',
+          headerShown: true,
+          headerTitle: 'Add New Habit',
+          headerStyle: {
+            backgroundColor: colors.card,
+          },
+          headerTintColor: colors.primary,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="add-circle" size={size} color={color} />
+          ),
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="streak"
+        options={{
+          title: 'Streak',
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="flame-outline" size={size} color={color} />
           ),
         }}
       />

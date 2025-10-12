@@ -6,52 +6,50 @@ import React from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
-import { TaskFrequency, useTasks } from '../context/TasksContext';
 
-interface Task {
+interface Habit {
   id: string;
   name: string;
-  streak: number;
-  completedToday: boolean;
+  description?: string;
+  targetDate?: string;
+  completed: boolean;
   emoji: string;
-  frequency: TaskFrequency;
 }
 
-interface TaskListProps {
-  tasks: Task[];
+interface HabitListProps {
+  habits: Habit[];
   showEmojis: boolean;
-  onToggleTask: (id: string) => void;
-  onRemoveTask: (id: string) => void;
+  onToggleHabit: (id: string) => void;
+  onRemoveHabit: (id: string) => void;
 }
 
-export default function TaskList({ tasks, showEmojis, onToggleTask, onRemoveTask }: TaskListProps) {
+export default function HabitList({ habits, showEmojis, onToggleHabit, onRemoveHabit }: HabitListProps) {
   const { colors } = useTheme();
-  const { toggleTask } = useTasks();
 
   const renderRightActions = (id: string) => {
     return (
       <TouchableOpacity
         style={[styles.deleteAction, { backgroundColor: colors.primary }]}
-        onPress={() => onRemoveTask(id)}
+        onPress={() => onRemoveHabit(id)}
       >
         <Ionicons name="trash" size={24} color="white" />
       </TouchableOpacity>
     );
   };
 
-  if (tasks.length === 0) {
+  if (habits.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons name="list" size={64} color={colors.primary} />
+        <Ionicons name="flag" size={64} color={colors.primary} />
         <Text style={[styles.emptyText, { color: colors.text }]}>
-          No tasks yet. Add your first task!
+          No habits yet. Add your first habit!
         </Text>
         <View style={{ height: 20 }} />
 
-        <Link href="/add" asChild>
+        <Link href="/(tabs)/addhabit" asChild>
           <TouchableOpacity style={styles.addFirstButton}>
             <Ionicons name="add" size={24} color="white" />
-            <Text style={styles.addFirstButtonText}>Add Your First Task</Text>
+            <Text style={styles.addFirstButtonText}>Add Your First Habit</Text>
           </TouchableOpacity>
         </Link>
       </View>
@@ -63,38 +61,37 @@ export default function TaskList({ tasks, showEmojis, onToggleTask, onRemoveTask
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="auto" />
         <View style={styles.container}>
-          <ScrollView style={styles.taskList}>
-            {tasks.map((task) => (
+          <ScrollView style={styles.habitList}>
+            {habits.map((habit) => (
               <Swipeable
-                key={task.id}
-                renderRightActions={() => renderRightActions(task.id)}
+                key={habit.id}
+                renderRightActions={() => renderRightActions(habit.id)}
               >
-                <View style={[styles.taskItem, { backgroundColor: colors.card }]}>
-                  <View style={styles.taskInfo}>
-                    {showEmojis && <Text style={styles.emoji}>{task.emoji}</Text>}
-                    <View style={styles.taskDetails}>
-                      <Text style={[styles.taskName, { color: colors.text }]}>{task.name}</Text>
-                      <View style={styles.taskMeta}>
-                        {task.frequency !== 'one-time' && (
-                          <Text style={[styles.streakText, { color: colors.secondary }]}>
-                            {task.streak} day streak 🔥
-                          </Text>
-                        )}
-                        <Text style={[styles.frequencyText, { color: colors.secondary }]}>
-                          {task.frequency === 'one-time' ? 'One Time' : 
-                           task.frequency === 'daily' ? 'Daily' : 'Weekly'}
+                <View style={[styles.habitItem, { backgroundColor: colors.card }]}>
+                  <View style={styles.habitInfo}>
+                    {showEmojis && <Text style={styles.emoji}>{habit.emoji}</Text>}
+                    <View style={styles.habitDetails}>
+                      <Text style={[styles.habitName, { color: colors.text }]}>{habit.name}</Text>
+                      {habit.description && (
+                        <Text style={[styles.descriptionText, { color: colors.secondary }]}>
+                          {habit.description}
                         </Text>
-                      </View>
+                      )}
+                      {habit.targetDate && (
+                        <Text style={[styles.dateText, { color: colors.secondary }]}>
+                          Target: {habit.targetDate}
+                        </Text>
+                      )}
                     </View>
                   </View>
                   <TouchableOpacity
                     style={[
                       styles.checkbox,
-                      task.completedToday && { backgroundColor: colors.primary }
+                      habit.completed && { backgroundColor: colors.primary }
                     ]}
-                    onPress={() => onToggleTask(task.id)}
+                    onPress={() => onToggleHabit(habit.id)}
                   >
-                    {task.completedToday && (
+                    {habit.completed && (
                       <Ionicons name="checkmark" size={20} color="white" />
                     )}
                   </TouchableOpacity>
@@ -115,7 +112,9 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   emptyContainer: {
     flex: 1,
@@ -143,10 +142,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 8,
   },
-  taskList: {
+  habitList: {
     flex: 1,
   },
-  taskItem: {
+  habitItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -154,7 +153,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  taskInfo: {
+  habitInfo: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -163,26 +162,20 @@ const styles = StyleSheet.create({
     fontSize: 24,
     marginRight: 12,
   },
-  taskDetails: {
+  habitDetails: {
     flex: 1,
   },
-  taskName: {
+  habitName: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
   },
-  streakText: {
+  descriptionText: {
     fontSize: 14,
+    marginBottom: 2,
   },
-  taskMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  frequencyText: {
+  dateText: {
     fontSize: 12,
-    fontWeight: '500',
-    textTransform: 'uppercase',
   },
   checkbox: {
     width: 24,
@@ -198,4 +191,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: 80,
   },
-}); 
+});
+

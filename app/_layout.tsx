@@ -1,5 +1,6 @@
 import '@/config/firebase'; // Initialize Firebase
 import { AuthProvider } from '@/context/AuthContext';
+import { HabitsProvider } from '@/context/HabitsContext';
 import { TasksProvider } from '@/context/TasksContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { Stack } from 'expo-router';
@@ -17,6 +18,13 @@ function RootLayoutNav() {
         name="(tabs)" 
         options={{ headerShown: false }} 
       />
+      <Stack.Screen 
+        name="editprofile" 
+        options={{ 
+          headerShown: false,
+          presentation: 'modal'
+        }} 
+      />
     </Stack>
   );
 }
@@ -26,7 +34,9 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <TasksProvider>
-          <RootLayoutNav />
+          <HabitsProvider>
+            <RootLayoutNav />
+          </HabitsProvider>
         </TasksProvider>
       </AuthProvider>
     </ThemeProvider>

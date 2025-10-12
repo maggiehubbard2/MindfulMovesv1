@@ -104,7 +104,10 @@ export default function SettingsScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Account</Text>
-          <View style={[styles.settingItem, { backgroundColor: colors.card }]}>
+          <TouchableOpacity 
+            style={[styles.settingItem, { backgroundColor: colors.card }]}
+            onPress={() => router.push('/editprofile')}
+          >
             <View style={styles.settingInfo}>
               <Ionicons name="person-outline" size={24} color={colors.text} />
               <View style={styles.userInfo}>
@@ -114,7 +117,8 @@ export default function SettingsScreen() {
                 <Text style={[styles.userEmail, { color: colors.secondary }]}>{user?.email}</Text>
               </View>
             </View>
-          </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.secondary} />
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.logoutButton, { backgroundColor: '#FF3B30' }]}
             onPress={handleLogout}

@@ -1,28 +1,24 @@
-import AddTask from '@/components/AddTask';
+import AddHabit from '@/components/AddHabit';
 import Quote from '@/components/Quote';
-import { TaskFrequency, useTasks } from '@/context/TasksContext';
+import { useHabits } from '@/context/HabitsContext';
 import { getRandomQuote } from '@/utils/quoteUtils';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 
-function AddScreenContent() {
-  const { addTask } = useTasks();
+function AddHabitScreenContent() {
+  const { addHabit } = useHabits();
   const quote = getRandomQuote();
-
-  const handleAddTask = (name: string, emoji: string, frequency: TaskFrequency, habitId?: string) => {
-    addTask(name, emoji, frequency, habitId);
-  };
 
   return (
     <View style={styles.container}>
       <Quote text={quote.text} author={quote.author} style={styles.quote} />
-      <AddTask onAddTask={handleAddTask} />
+      <AddHabit onAddHabit={addHabit} />
     </View>
   );
 }
 
-export default function AddScreen() {
-  return <AddScreenContent />;
+export default function AddHabitScreen() {
+  return <AddHabitScreenContent />;
 }
 
 const styles = StyleSheet.create({
@@ -34,3 +30,4 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
 });
+
