@@ -119,10 +119,11 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       );
       
       const querySnapshot = await getDocs(tasksQuery);
-      const firestoreTasks: Task[] = querySnapshot.docs.map(doc => {
-        const data = doc.data();
+      
+      const firestoreTasks: Task[] = querySnapshot.docs.map(docSnapshot => {
+        const data = docSnapshot.data();
         return {
-          id: doc.id,
+          id: docSnapshot.id,
           name: data.name,
           streak: data.streak || 0,
           completedToday: data.completedToday || false,

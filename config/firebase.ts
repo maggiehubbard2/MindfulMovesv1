@@ -1,10 +1,8 @@
-// Firebase Web SDK Configuration
-import { FirebaseApp, initializeApp } from "firebase/app";
+// Firebase Web SDK Configuration (works with Expo Go, no CocoaPods needed)
+import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
 
-// Paste your Firebase config object here
 const firebaseConfig = {
   apiKey: "AIzaSyDlDLAK6916ZxgoJufdi4Koq0INhGIFkY8",
   authDomain: "mindful-moves.firebaseapp.com",
@@ -15,10 +13,8 @@ const firebaseConfig = {
   measurementId: "G-T8N5FMPGVC"
 };
 
-// Initialize Firebase
-const app: FirebaseApp = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
 
-// Export the services you need
+// Export Firebase services
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const storage = getStorage(app);

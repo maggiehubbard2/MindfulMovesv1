@@ -8,9 +8,7 @@ interface Habit {
   id: string;
   name: string;
   description?: string;
-  targetDate?: string;
   completed: boolean;
-  emoji: string;
   userId: string;
   createdAt: Date;
   completedAt?: Date;
@@ -18,7 +16,7 @@ interface Habit {
 
 interface HabitsContextType {
   habits: Habit[];
-  addHabit: (name: string, emoji: string, description?: string, targetDate?: string) => Promise<void>;
+  addHabit: (name: string, description?: string) => Promise<void>;
   toggleHabit: (id: string) => Promise<void>;
   removeHabit: (id: string) => Promise<void>;
 }
@@ -48,15 +46,13 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       );
       
       const querySnapshot = await getDocs(habitsQuery);
-      const firestoreHabits: Habit[] = querySnapshot.docs.map(doc => {
-        const data = doc.data();
+      const firestoreHabits: Habit[] = querySnapshot.docs.map(docSnapshot => {
+        const data = docSnapshot.data();
         return {
-          id: doc.id,
+          id: docSnapshot.id,
           name: data.name,
           description: data.description,
-          targetDate: data.targetDate,
           completed: data.completed || false,
-          emoji: data.emoji,
           userId: data.userId,
           createdAt: data.createdAt?.toDate() || new Date(),
           completedAt: data.completedAt?.toDate(),
@@ -73,16 +69,14 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addHabit = async (name: string, emoji: string, description?: string, targetDate?: string) => {
+  const addHabit = async (name: string, description?: string) => {
     if (!user) return;
     
     try {
       const habitData = {
         name,
         description,
-        targetDate,
         completed: false,
-        emoji,
         userId: user.uid,
         createdAt: new Date(),
       };
@@ -106,9 +100,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         id: Date.now().toString(),
         name,
         description,
-        targetDate,
         completed: false,
-        emoji,
         userId: user.uid,
         createdAt: new Date(),
       };

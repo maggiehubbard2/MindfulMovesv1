@@ -1,7 +1,9 @@
+import Quote from '@/components/Quote';
 import TaskList from '@/components/TaskList';
 import { useAuth } from '@/context/AuthContext';
 import { useTasks } from '@/context/TasksContext';
-import { ThemeContextType, useTheme } from '@/context/ThemeContext';
+import { useTheme } from '@/context/ThemeContext';
+import { getRandomQuote } from '@/utils/quoteUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -10,13 +12,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function TabOneScreen() {
   const { tasks, showEmojis, addTask, toggleTask, removeTask } = useTasks();
-  const { colors, isDarkMode, toggleDarkMode }: ThemeContextType = useTheme();
+  const { colors, isDarkMode, toggleDarkMode } = useTheme();
   const { userProfile, user } = useAuth();
 
   // Get current day name
   const today = new Date();
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const currentDayName = dayNames[today.getDay()];
+  
+  // Get random quote for footer
+  const quote = getRandomQuote();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -28,9 +33,12 @@ export default function TabOneScreen() {
           </Text>
         </View>
         
+        {/* Quote */}
+        <Quote text={quote.text} author={quote.author} style={styles.quote} />
+        
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           <View style={styles.cardHeader}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{currentDayName}'s TODOs</Text>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>{currentDayName}'s TODOs: </Text>
           </View>
           <TaskList 
             tasks={tasks} 
@@ -88,6 +96,9 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 20,
     fontWeight: '600',
+  },
+  quote: {
+    marginBottom: 16,
   },
   fab: {
     position: 'absolute',

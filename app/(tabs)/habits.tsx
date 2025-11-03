@@ -1,7 +1,6 @@
 import HabitList from '@/components/HabitList';
 import { useAuth } from '@/context/AuthContext';
 import { useHabits } from '@/context/HabitsContext';
-import { useTasks } from '@/context/TasksContext';
 import { ThemeContextType, useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -11,7 +10,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HabitsScreen() {
   const { habits, toggleHabit, removeHabit } = useHabits();
-  const { showEmojis } = useTasks();
   const { colors, isDarkMode }: ThemeContextType = useTheme();
   const { userProfile } = useAuth();
 
@@ -27,7 +25,6 @@ export default function HabitsScreen() {
         </View>
         <HabitList 
           habits={habits} 
-          showEmojis={showEmojis} 
           onToggleHabit={toggleHabit}
           onRemoveHabit={removeHabit}
         />

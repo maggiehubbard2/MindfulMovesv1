@@ -11,19 +11,16 @@ interface Habit {
   id: string;
   name: string;
   description?: string;
-  targetDate?: string;
   completed: boolean;
-  emoji: string;
 }
 
 interface HabitListProps {
   habits: Habit[];
-  showEmojis: boolean;
   onToggleHabit: (id: string) => void;
   onRemoveHabit: (id: string) => void;
 }
 
-export default function HabitList({ habits, showEmojis, onToggleHabit, onRemoveHabit }: HabitListProps) {
+export default function HabitList({ habits, onToggleHabit, onRemoveHabit }: HabitListProps) {
   const { colors } = useTheme();
 
   const renderRightActions = (id: string) => {
@@ -69,17 +66,11 @@ export default function HabitList({ habits, showEmojis, onToggleHabit, onRemoveH
               >
                 <View style={[styles.habitItem, { backgroundColor: colors.card }]}>
                   <View style={styles.habitInfo}>
-                    {showEmojis && <Text style={styles.emoji}>{habit.emoji}</Text>}
                     <View style={styles.habitDetails}>
                       <Text style={[styles.habitName, { color: colors.text }]}>{habit.name}</Text>
                       {habit.description && (
                         <Text style={[styles.descriptionText, { color: colors.secondary }]}>
                           {habit.description}
-                        </Text>
-                      )}
-                      {habit.targetDate && (
-                        <Text style={[styles.dateText, { color: colors.secondary }]}>
-                          Target: {habit.targetDate}
                         </Text>
                       )}
                     </View>
@@ -157,10 +148,6 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  emoji: {
-    fontSize: 24,
-    marginRight: 12,
   },
   habitDetails: {
     flex: 1,
