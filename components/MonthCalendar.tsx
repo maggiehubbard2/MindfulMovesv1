@@ -1,7 +1,7 @@
 import { useHabits } from '@/context/HabitsContext';
-import { useTasks } from '@/context/TasksContext';
 import { useTheme } from '@/context/ThemeContext';
-import { getMonthDates, getMonthStats, getTaskCompletionForDate } from '@/utils/calendarUtils';
+import { getMonthDates } from '@/utils/calendarUtils';
+import { getHabitCompletionForDate, getHabitMonthStats } from '@/utils/habitCalendarUtils';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -13,7 +13,6 @@ interface MonthCalendarProps {
 
 export default function MonthCalendar({ onDatePress }: MonthCalendarProps) {
   const { colors } = useTheme();
-  const { tasks } = useTasks();
   const { habits } = useHabits();
   const [currentDate, setCurrentDate] = useState(new Date());
   
@@ -21,7 +20,7 @@ export default function MonthCalendar({ onDatePress }: MonthCalendarProps) {
   const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
   
   const monthDates = getMonthDates(currentYear, currentMonth);
-  const monthStats = getMonthStats(tasks, currentYear, currentMonth);
+  const monthStats = getHabitMonthStats(habits, currentYear, currentMonth);
   
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -53,7 +52,7 @@ export default function MonthCalendar({ onDatePress }: MonthCalendarProps) {
   
   const getCompletionPercentage = (date: Date) => {
     if (!isCurrentMonth(date)) return 0;
-    return getTaskCompletionForDate(tasks, date);
+    return getHabitCompletionForDate(habits, date);
   };
 
   return (
@@ -99,10 +98,10 @@ export default function MonthCalendar({ onDatePress }: MonthCalendarProps) {
         </View>
         <View style={styles.statItem}>
           <Text style={[styles.statValue, { color: colors.primary }]}>
-            {monthStats.totalHabitTasks}
+            {monthStats.totalHabits}
           </Text>
           <Text style={[styles.statLabel, { color: colors.secondary }]}>
-            Habits
+            Goals
           </Text>
         </View>
         <View style={styles.statItem}>

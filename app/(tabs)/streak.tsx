@@ -11,7 +11,7 @@ export default function StreakScreen() {
   const { userProfile } = useAuth();
 
   const handleDatePress = (date: Date) => {
-    // TODO: Could show detailed breakdown of tasks for that day
+    // TODO: Could show detailed breakdown of habits for that day
     console.log('Date pressed:', date.toISOString().split('T')[0]);
   };
 

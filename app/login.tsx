@@ -108,10 +108,10 @@ export default function LoginScreen() {
       if (isSignUp) {
         await signUp(email, password, firstName);
         Alert.alert('Success', 'Account created successfully!');
-        router.replace('/(tabs)');
+        router.replace('/(tabs)/dashboard');
       } else {
         await signIn(email, password);
-        router.replace('/(tabs)');
+        router.replace('/(tabs)/dashboard');
       }
     } catch (error: any) {
       // Handle specific Firebase errors

@@ -1,5 +1,4 @@
 import { useAuth } from '@/context/AuthContext';
-import { useTasks } from '@/context/TasksContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -9,7 +8,6 @@ import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, V
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SettingsScreen() {
-  const { showEmojis, toggleEmojis } = useTasks();
   const { isDarkMode, toggleDarkMode, colors, accentColor, setAccentColor } = useTheme();
   const { user, userProfile, logout } = useAuth();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -47,21 +45,6 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Display Settings</Text>
           
-          <View style={[styles.settingItem, { backgroundColor: colors.card }]}>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: colors.text }]}>Show Emojis</Text>
-              <Text style={[styles.settingDescription, { color: colors.secondary }]}>
-                Toggle the display of emojis in your task list
-              </Text>
-            </View>
-            <Switch
-              value={showEmojis}
-              onValueChange={toggleEmojis}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor={showEmojis ? colors.primary : '#f4f3f4'}
-            />
-          </View>
-
           <View style={[styles.settingItem, { backgroundColor: colors.card }]}>
             <View style={styles.settingInfo}>
               <Text style={[styles.settingTitle, { color: colors.text }]}>Dark Mode</Text>

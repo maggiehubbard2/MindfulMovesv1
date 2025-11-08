@@ -6,7 +6,6 @@ import { ActivityIndicator, Platform, View } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 
 import { HapticTab } from '@/components/HapticTab';
-import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
@@ -57,46 +56,31 @@ export default function TabLayout() {
         }),
       }}>
       <Tabs.Screen
-        name="index"
+        name="dashboard"
         options={{
-          title: 'TODO',
+          title: 'Dashboard',
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="list" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="add"
-        options={{
-          title: 'Add Task',
-          headerShown: true,
-          headerTitle: 'Add New Task',
-          headerStyle: {
-            backgroundColor: colors.card,
-          },
-          headerTintColor: colors.primary,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle" size={size} color={color} />
+            <Ionicons name="grid-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="habits"
         options={{
-          title: 'Habits',
+          title: 'Goals',
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="repeat-outline" size={size} color={color} />
+            <Ionicons name="flag-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="addhabit"
         options={{
-          title: 'Add Habit',
+          title: 'Add Goal',
           headerShown: true,
-          headerTitle: 'Add New Habit',
+          headerTitle: 'Add New Goal',
           headerStyle: {
             backgroundColor: colors.card,
           },
@@ -110,19 +94,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="streak"
         options={{
-          title: 'Streak',
+          title: 'Progress',
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="flame-outline" size={size} color={color} />
           ),
-        }}
-      />
-      <Tabs.Screen
-        name="manager"
-        options={{
-          title: 'Task Manager',
-          headerShown: false,
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="checkmark.circle" color={color} />,
         }}
       />
       <Tabs.Screen

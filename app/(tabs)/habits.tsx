@@ -19,9 +19,9 @@ export default function HabitsScreen() {
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
         <View style={[styles.header, { backgroundColor: colors.card }]}>
           <Text style={[styles.greeting, { color: colors.text }]}>
-            {userProfile?.firstName}'s Habits
+            {userProfile?.firstName}'s Goals
           </Text>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Build Better Routines</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Track Your Progress</Text>
         </View>
         <HabitList 
           habits={habits} 
