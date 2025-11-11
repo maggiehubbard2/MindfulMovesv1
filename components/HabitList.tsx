@@ -1,3 +1,4 @@
+import { useGoals } from '@/context/GoalsContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
@@ -12,6 +13,7 @@ interface Habit {
   name: string;
   description?: string;
   completed: boolean;
+  goalId?: string;
 }
 
 interface HabitListProps {
@@ -22,6 +24,7 @@ interface HabitListProps {
 
 export default function HabitList({ habits, onToggleHabit, onRemoveHabit }: HabitListProps) {
   const { colors } = useTheme();
+  const { goals } = useGoals();
 
   const renderRightActions = (id: string) => {
     return (
@@ -43,7 +46,7 @@ export default function HabitList({ habits, onToggleHabit, onRemoveHabit }: Habi
         </Text>
         <View style={{ height: 20 }} />
 
-        <Link href="/(tabs)/addhabit" asChild>
+        <Link href="/addhabit" asChild>
           <TouchableOpacity style={styles.addFirstButton}>
             <Ionicons name="add" size={24} color="white" />
             <Text style={styles.addFirstButtonText}>Add Your First Habit</Text>
@@ -71,6 +74,11 @@ export default function HabitList({ habits, onToggleHabit, onRemoveHabit }: Habi
                       {habit.description && (
                         <Text style={[styles.descriptionText, { color: colors.secondary }]}>
                           {habit.description}
+                        </Text>
+                      )}
+                      {habit.goalId && (
+                        <Text style={[styles.goalBadge, { color: colors.primary }]}>
+                          Linked goal: {goals.find((goal) => goal.id === habit.goalId)?.title ?? 'Unknown goal'}
                         </Text>
                       )}
                     </View>
@@ -156,6 +164,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
+  },
+  goalBadge: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   descriptionText: {
     fontSize: 14,

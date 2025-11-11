@@ -77,7 +77,7 @@ export default function DashboardScreen() {
           {/* Floating Action Button */}
           <TouchableOpacity
             style={[styles.fab, { backgroundColor: colors.primary }]}
-            onPress={() => router.push('/(tabs)/addhabit')}
+            onPress={() => router.push('/addhabit')}
             activeOpacity={0.8}
           >
             <Ionicons name="add" size={28} color="white" />

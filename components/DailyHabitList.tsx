@@ -1,3 +1,4 @@
+import { useGoals } from '@/context/GoalsContext';
 import { useHabits } from '@/context/HabitsContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +13,7 @@ interface DailyHabitListProps {
 
 export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitListProps) {
   const { habits, toggleHabit } = useHabits();
+  const { goals } = useGoals();
   const { colors } = useTheme();
 
   const displayedHabits = maxItems ? habits.slice(0, maxItems) : habits;
@@ -55,7 +57,7 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
       <View style={styles.emptyContainer}>
         <Ionicons name="list-outline" size={48} color={colors.secondary} />
         <Text style={[styles.emptyText, { color: colors.secondary }]}>
-          No habits yet. Start by adding your first goal!
+          No habits yet. Start by adding your first habit!
         </Text>
       </View>
     );
@@ -82,6 +84,7 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
           const isCompleted = habit.completed;
           const icon = getHabitIcon(habit.name, index);
           const isLast = index === displayedHabits.length - 1;
+          const goal = habit.goalId ? goals.find((g) => g.id === habit.goalId) : undefined;
 
           return (
             <View key={habit.id} style={styles.habitRow}>
@@ -141,6 +144,11 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
                   {habit.description && (
                     <Text style={[styles.habitDescription, { color: colors.secondary }]} numberOfLines={1}>
                       {habit.description}
+                    </Text>
+                  )}
+                  {goal && (
+                    <Text style={[styles.goalTag, { color: colors.primary }]} numberOfLines={1}>
+                      Goal: {goal.title}
                     </Text>
                   )}
                 </View>
@@ -250,6 +258,13 @@ const styles = StyleSheet.create({
   },
   habitDescription: {
     fontSize: 12,
+  },
+  goalTag: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   habitMeta: {
     alignItems: 'flex-end',

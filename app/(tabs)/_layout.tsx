@@ -10,9 +10,13 @@ import TabBarBackground from '@/components/ui/TabBarBackground';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function TabLayout() {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const { user, loading } = useAuth();
   const colorScheme = useColorScheme();
+  const navigationBackground = isDarkMode ? '#F2F2F7' : colors.card;
+  const navigationBorder = isDarkMode ? '#C6C6C8' : colors.border;
+  const navigationText = isDarkMode ? '#1C1C1E' : colors.text;
+  const tabInactiveTint = isDarkMode ? '#3C3C43' : colors.text;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -36,22 +40,22 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.text,
+        tabBarInactiveTintColor: tabInactiveTint,
         headerStyle: {
-          backgroundColor: colors.card,
+          backgroundColor: navigationBackground,
         },
-        headerTintColor: colors.text,
+        headerTintColor: navigationText,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
         tabBarStyle: Platform.select({
           ios: {
-            backgroundColor: colors.card,
-            borderTopColor: colors.border,
+            backgroundColor: navigationBackground,
+            borderTopColor: navigationBorder,
             position: 'absolute',
           },
           default: {
-            backgroundColor: colors.card,
-            borderTopColor: colors.border,
+            backgroundColor: navigationBackground,
+            borderTopColor: navigationBorder,
           },
         }),
       }}>
@@ -68,6 +72,16 @@ export default function TabLayout() {
       <Tabs.Screen
         name="habits"
         options={{
+          title: 'Habits',
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="checkmark-done-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="goals"
+        options={{
           title: 'Goals',
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
@@ -76,17 +90,17 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="addhabit"
+        name="addgoal"
         options={{
           title: 'Add Goal',
           headerShown: true,
-          headerTitle: 'Add New Goal',
+          headerTitle: 'Create Goal',
           headerStyle: {
-            backgroundColor: colors.card,
+            backgroundColor: navigationBackground,
           },
-          headerTintColor: colors.primary,
+          headerTintColor: navigationText,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle" size={size} color={color} />
+            <Ionicons name="flag" size={size} color={color} />
           ),
           href: null,
         }}

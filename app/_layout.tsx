@@ -1,5 +1,6 @@
 import '@/config/firebase'; // Initialize Firebase
 import { AuthProvider } from '@/context/AuthContext';
+import { GoalsProvider } from '@/context/GoalsContext';
 import { HabitsProvider } from '@/context/HabitsContext';
 import { TasksProvider } from '@/context/TasksContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
@@ -18,6 +19,13 @@ function RootLayoutNav() {
         name="(tabs)" 
         options={{ headerShown: false }} 
       />
+      <Stack.Screen
+        name="addhabit"
+        options={{
+          headerShown: false,
+          presentation: 'modal',
+        }}
+      />
       <Stack.Screen 
         name="editprofile" 
         options={{ 
@@ -34,9 +42,11 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <TasksProvider>
-          <HabitsProvider>
-            <RootLayoutNav />
-          </HabitsProvider>
+          <GoalsProvider>
+            <HabitsProvider>
+              <RootLayoutNav />
+            </HabitsProvider>
+          </GoalsProvider>
         </TasksProvider>
       </AuthProvider>
     </ThemeProvider>

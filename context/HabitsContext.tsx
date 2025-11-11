@@ -12,11 +12,12 @@ interface Habit {
   userId: string;
   createdAt: Date;
   completedAt?: Date;
+  goalId?: string;
 }
 
 interface HabitsContextType {
   habits: Habit[];
-  addHabit: (name: string, description?: string) => Promise<void>;
+  addHabit: (name: string, description?: string, goalId?: string) => Promise<void>;
   toggleHabit: (id: string) => Promise<void>;
   removeHabit: (id: string) => Promise<void>;
 }
@@ -56,6 +57,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
           userId: data.userId,
           createdAt: data.createdAt?.toDate() || new Date(),
           completedAt: data.completedAt?.toDate(),
+          goalId: data.goalId || undefined,
         };
       });
       
@@ -69,7 +71,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addHabit = async (name: string, description?: string) => {
+  const addHabit = async (name: string, description?: string, goalId?: string) => {
     if (!user) return;
     
     try {
@@ -79,6 +81,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         completed: false,
         userId: user.uid,
         createdAt: new Date(),
+        goalId: goalId || null,
       };
       
       // Add to Firestore
@@ -88,6 +91,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       const newHabit: Habit = {
         id: docRef.id,
         ...habitData,
+        goalId: goalId || undefined,
       };
       
       setHabits([...habits, newHabit]);
@@ -103,6 +107,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         completed: false,
         userId: user.uid,
         createdAt: new Date(),
+        goalId,
       };
       const newHabits = [...habits, newHabit];
       setHabits(newHabits);

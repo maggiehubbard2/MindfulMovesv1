@@ -1,14 +1,16 @@
+import Quote from '@/components/Quote';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { getRandomQuote } from '@/utils/quoteUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
   const { colors } = useTheme();
-  const { signIn, signUp, resetPassword } = useAuth();
+  const { signIn, signUp, resetPassword, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -23,6 +25,7 @@ export default function LoginScreen() {
     password: '',
     firstName: ''
   });
+  const loadingQuote = useMemo(() => getRandomQuote(), []);
 
   const validateFields = () => {
     const newErrors = {
@@ -111,6 +114,7 @@ export default function LoginScreen() {
         router.replace('/(tabs)/dashboard');
       } else {
         await signIn(email, password);
+        console.log('signIn successful'); 
         router.replace('/(tabs)/dashboard');
       }
     } catch (error: any) {
@@ -136,6 +140,22 @@ export default function LoginScreen() {
       setLoading(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: colors.background }]} edges={['top']}>
+        <View style={styles.loadingContent}>
+          <Quote text={loadingQuote.text} author={loadingQuote.author} />
+          <View style={styles.loadingIndicator}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.secondary }]}>
+              Getting things ready...
+            </Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -385,6 +405,26 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingContent: {
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    gap: 24,
+  },
+  loadingIndicator: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   keyboardView: {
     flex: 1,

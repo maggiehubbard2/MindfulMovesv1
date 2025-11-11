@@ -19,9 +19,11 @@ export default function HabitsScreen() {
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
         <View style={[styles.header, { backgroundColor: colors.card }]}>
           <Text style={[styles.greeting, { color: colors.text }]}>
-            {userProfile?.firstName}'s Goals
+            {userProfile?.firstName ? `${userProfile.firstName}'s Habits` : 'Your Habits'}
           </Text>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Track Your Progress</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            Daily actions that move your goals forward.
+          </Text>
         </View>
         <HabitList 
           habits={habits} 
@@ -32,7 +34,7 @@ export default function HabitsScreen() {
         {/* Floating Action Button */}
         <TouchableOpacity
           style={[styles.fab, { backgroundColor: colors.primary }]}
-          onPress={() => router.push('/(tabs)/addhabit')}
+          onPress={() => router.push('/addhabit')}
         >
           <Ionicons name="add" size={28} color="white" />
         </TouchableOpacity>
