@@ -111,10 +111,11 @@ export default function LoginScreen() {
       if (isSignUp) {
         await signUp(email, password, firstName);
         Alert.alert('Success', 'Account created successfully!');
+        console.log('[Login] Sign up successful, routing to /(tabs)/dashboard');
         router.replace('/(tabs)/dashboard');
       } else {
         await signIn(email, password);
-        console.log('signIn successful'); 
+        console.log('[Login] Sign in successful, routing to /(tabs)/dashboard'); 
         router.replace('/(tabs)/dashboard');
       }
     } catch (error: any) {

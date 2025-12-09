@@ -18,6 +18,7 @@ interface Habit {
 interface HabitsContextType {
   habits: Habit[];
   addHabit: (name: string, description?: string, goalId?: string) => Promise<void>;
+  updateHabit: (id: string, name: string, description?: string, goalId?: string) => Promise<void>;
   toggleHabit: (id: string) => Promise<void>;
   removeHabit: (id: string) => Promise<void>;
 }
@@ -115,6 +116,34 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateHabit = async (id: string, name: string, description?: string, goalId?: string) => {
+    const habitToUpdate = habits.find(habit => habit.id === id);
+    if (!habitToUpdate) return;
+
+    const updatedHabit = {
+      ...habitToUpdate,
+      name,
+      description,
+      goalId: goalId || undefined,
+    };
+
+    // Update in Firestore
+    try {
+      await updateDoc(doc(db, 'habit', id), {
+        name,
+        description: description || null,
+        goalId: goalId || null,
+      });
+    } catch (error) {
+      // Firestore update failed, continue with local update
+    }
+
+    // Update local state
+    const newHabits = habits.map((habit) => habit.id === id ? updatedHabit : habit);
+    setHabits(newHabits);
+    await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
+  };
+
   const toggleHabit = async (id: string) => {
     const habitToUpdate = habits.find(habit => habit.id === id);
     if (!habitToUpdate) return;
@@ -159,7 +188,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <HabitsContext.Provider value={{ habits, addHabit, toggleHabit, removeHabit }}>
+    <HabitsContext.Provider value={{ habits, addHabit, updateHabit, toggleHabit, removeHabit }}>
       {children}
     </HabitsContext.Provider>
   );

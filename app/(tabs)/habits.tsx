@@ -9,7 +9,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HabitsScreen() {
-  const { habits, toggleHabit, removeHabit } = useHabits();
+  const { habits, toggleHabit, removeHabit, updateHabit } = useHabits();
   const { colors, isDarkMode }: ThemeContextType = useTheme();
   const { userProfile } = useAuth();
 
@@ -29,6 +29,7 @@ export default function HabitsScreen() {
           habits={habits} 
           onToggleHabit={toggleHabit}
           onRemoveHabit={removeHabit}
+          onUpdateHabit={updateHabit}
         />
         
         {/* Floating Action Button */}

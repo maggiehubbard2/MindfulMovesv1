@@ -20,7 +20,10 @@ export default function TabLayout() {
 
   useEffect(() => {
     if (!loading && !user) {
+      console.log('[Tabs] No user detected, routing to /login');
       router.replace('/login');
+    } else if (user) {
+      console.log('[Tabs] User authenticated, showing tabs');
     }
   }, [user, loading]);
 
