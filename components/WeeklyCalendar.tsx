@@ -1,5 +1,6 @@
 import { useHabits } from '@/context/HabitsContext';
 import { useTheme } from '@/context/ThemeContext';
+import { getHabitCompletionForDate } from '@/utils/habitCalendarUtils';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -57,17 +58,8 @@ export default function WeeklyCalendar({ onDatePress }: WeeklyCalendarProps) {
   };
 
   const getCompletionPercentage = (date: Date): number => {
-    const dateStr = date.toISOString().split('T')[0];
-    const totalHabits = habits.length;
-    
-    if (totalHabits === 0) return 0;
-    
-    // Count completed habits for this date
-    // For now, we'll use the current completion status
-    // In a full implementation, you'd track daily habit completion
-    const completedHabits = habits.filter(habit => habit.completed).length;
-    
-    return (completedHabits / totalHabits) * 100;
+    // Use the utility function which properly filters habits by creation date
+    return getHabitCompletionForDate(habits, date);
   };
 
   const weekDates = getWeekDates(currentWeekStart);

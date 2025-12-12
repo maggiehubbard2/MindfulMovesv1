@@ -101,7 +101,7 @@ export default function MonthCalendar({ onDatePress }: MonthCalendarProps) {
             {monthStats.totalHabits}
           </Text>
           <Text style={[styles.statLabel, { color: colors.secondary }]}>
-            Goals
+            Habits
           </Text>
         </View>
         <View style={styles.statItem}>

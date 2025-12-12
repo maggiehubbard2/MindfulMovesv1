@@ -2,6 +2,7 @@ import DailyHabitList from '@/components/DailyHabitList';
 import ReminderCard from '@/components/ReminderCard';
 import WeeklyCalendar from '@/components/WeeklyCalendar';
 import { useAuth } from '@/context/AuthContext';
+import { useHabits } from '@/context/HabitsContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -12,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function DashboardScreen() {
   const { colors, isDarkMode } = useTheme();
   const { userProfile } = useAuth();
+  const { setSelectedDate } = useHabits();
 
   // Get time-based greeting
   const today = new Date();
@@ -35,8 +37,9 @@ export default function DashboardScreen() {
   });
 
   const handleDatePress = (date: Date) => {
-    // Could navigate to a detailed view for that date
-    console.log('Date pressed:', date.toISOString().split('T')[0]);
+    // Navigate to habits screen with the selected date
+    setSelectedDate(date);
+    router.push('/(tabs)/habits');
   };
 
   return (

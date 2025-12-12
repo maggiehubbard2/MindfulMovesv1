@@ -1,10 +1,16 @@
-import { useGoals } from '@/context/GoalsContext';
 import { useHabits } from '@/context/HabitsContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
 interface DailyHabitListProps {
   onHabitToggle?: (id: string) => void;
@@ -12,12 +18,25 @@ interface DailyHabitListProps {
 }
 
 export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitListProps) {
-  const { habits, toggleHabit } = useHabits();
-  const { goals } = useGoals();
+  const { selectedDate, getHabitsForDate, toggleHabit, canEditDate } = useHabits();
   const { colors } = useTheme();
+  
+  const habits = getHabitsForDate(selectedDate);
+  const isEditable = canEditDate(selectedDate);
 
-  const displayedHabits = maxItems ? habits.slice(0, maxItems) : habits;
-  const hasMore = maxItems && habits.length > maxItems;
+  // Sort habits: unchecked first (for dashboard view only)
+  // This keeps the user's custom order but prioritizes incomplete habits
+  const sortedHabits = [...habits].sort((a, b) => {
+    if (a.completed === b.completed) {
+      // If both have same completion status, maintain original order
+      return 0;
+    }
+    // Unchecked items come first
+    return a.completed ? 1 : -1;
+  });
+
+  const displayedHabits = maxItems ? sortedHabits.slice(0, maxItems) : sortedHabits;
+  const hasMore = maxItems && sortedHabits.length > maxItems;
 
   const iconColors = [
     '#FFA07A', // Light salmon
@@ -48,7 +67,8 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
   };
 
   const handleToggle = (id: string) => {
-    toggleHabit(id);
+    if (!isEditable) return;
+    toggleHabit(id, selectedDate);
     onHabitToggle?.(id);
   };
 
@@ -84,87 +104,152 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
           const isCompleted = habit.completed;
           const icon = getHabitIcon(habit.name, index);
           const isLast = index === displayedHabits.length - 1;
-          const goal = habit.goalId ? goals.find((g) => g.id === habit.goalId) : undefined;
 
           return (
-            <View key={habit.id} style={styles.habitRow}>
-              {/* Completion Indicator Line */}
-              <View style={styles.indicatorColumn}>
-                {!isLast && (
-                  <View style={[
-                    styles.indicatorLine,
-                    { 
-                      backgroundColor: isCompleted ? colors.primary : colors.border,
-                      opacity: isCompleted ? 1 : 0.3
-                    }
-                  ]} />
-                )}
-                <View style={[
-                  styles.completionIndicator,
-                  { 
-                    backgroundColor: isCompleted ? colors.primary : 'transparent',
-                    borderColor: isCompleted ? colors.primary : colors.border
-                  }
-                ]}>
-                  {isCompleted && (
-                    <Ionicons name="checkmark" size={12} color="white" />
-                  )}
-                </View>
-              </View>
-
-              {/* Habit Card */}
-              <TouchableOpacity
-                style={[
-                  styles.habitCard,
-                  { backgroundColor: colors.card }
-                ]}
-                onPress={() => handleToggle(habit.id)}
-                activeOpacity={0.7}
-              >
-                {/* Icon */}
-                <View style={[
-                  styles.iconContainer,
-                  { backgroundColor: icon.color + '20' }
-                ]}>
-                  <Ionicons name={icon.name as any} size={24} color={icon.color} />
-                </View>
-
-                {/* Habit Info */}
-                <View style={styles.habitInfo}>
-                  <Text style={[
-                    styles.habitName,
-                    { 
-                      color: colors.text,
-                      textDecorationLine: isCompleted ? 'line-through' : 'none',
-                      opacity: isCompleted ? 0.6 : 1
-                    }
-                  ]}>
-                    {habit.name}
-                  </Text>
-                  {habit.description && (
-                    <Text style={[styles.habitDescription, { color: colors.secondary }]} numberOfLines={1}>
-                      {habit.description}
-                    </Text>
-                  )}
-                  {goal && (
-                    <Text style={[styles.goalTag, { color: colors.primary }]} numberOfLines={1}>
-                      Goal: {goal.title}
-                    </Text>
-                  )}
-                </View>
-
-                {/* Duration/Streak */}
-                <View style={styles.habitMeta}>
-                  <View style={styles.metaRow}>
-                    <Ionicons name="time-outline" size={14} color={colors.secondary} />
-                    <Text style={[styles.metaText, { color: colors.secondary }]}>5 min</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            </View>
+            <AnimatedHabitRow
+              key={habit.id}
+              habit={habit}
+              index={index}
+              isLast={isLast}
+              icon={icon}
+              colors={colors}
+              isEditable={isEditable}
+              onToggle={() => handleToggle(habit.id)}
+            />
           );
         })}
       </ScrollView>
+    </View>
+  );
+}
+
+interface AnimatedHabitRowProps {
+  habit: any;
+  index: number;
+  isLast: boolean;
+  icon: { name: string; color: string };
+  colors: any;
+  isEditable: boolean;
+  onToggle: () => void;
+}
+
+function AnimatedHabitRow({ habit, index, isLast, icon, colors, isEditable, onToggle }: AnimatedHabitRowProps) {
+  const isCompleted = habit.completed;
+  const indicatorScale = useSharedValue(1);
+  const checkmarkScale = useSharedValue(0);
+  const cardScale = useSharedValue(1);
+  const [wasCompleted, setWasCompleted] = useState(isCompleted);
+
+  useEffect(() => {
+    if (isCompleted && !wasCompleted) {
+      // Bounce animation when completed
+      indicatorScale.value = withSequence(
+        withSpring(1.3, { damping: 6, stiffness: 200 }),
+        withSpring(1, { damping: 8, stiffness: 200 })
+      );
+      checkmarkScale.value = withSequence(
+        withTiming(0, { duration: 0 }),
+        withSpring(1, { damping: 8, stiffness: 200 })
+      );
+      cardScale.value = withSequence(
+        withSpring(1.02, { damping: 10, stiffness: 150 }),
+        withSpring(1, { damping: 10, stiffness: 150 })
+      );
+    } else if (!isCompleted) {
+      checkmarkScale.value = withTiming(0, { duration: 150 });
+      indicatorScale.value = withTiming(1, { duration: 150 });
+      cardScale.value = withTiming(1, { duration: 150 });
+    }
+    setWasCompleted(isCompleted);
+  }, [isCompleted]);
+
+  const animatedIndicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: indicatorScale.value }],
+  }));
+
+  const animatedCheckmarkStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: checkmarkScale.value }],
+  }));
+
+  const animatedCardStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: cardScale.value }],
+  }));
+
+  return (
+    <View style={styles.habitRow}>
+      {/* Completion Indicator Line */}
+      <View style={styles.indicatorColumn}>
+        {!isLast && (
+          <View style={[
+            styles.indicatorLine,
+            { 
+              backgroundColor: isCompleted ? colors.primary : colors.border,
+              opacity: isCompleted ? 1 : 0.3
+            }
+          ]} />
+        )}
+        <Animated.View
+          style={[
+            styles.completionIndicator,
+            { 
+              backgroundColor: isCompleted ? colors.primary : 'transparent',
+              borderColor: isCompleted ? colors.primary : colors.border
+            },
+            animatedIndicatorStyle,
+          ]}
+        >
+          {isCompleted && (
+            <Animated.View style={animatedCheckmarkStyle}>
+              <Ionicons name="checkmark" size={12} color="white" />
+            </Animated.View>
+          )}
+        </Animated.View>
+      </View>
+
+      {/* Habit Card */}
+      <Animated.View style={[styles.habitCardWrapper, animatedCardStyle]}>
+        <TouchableOpacity
+          style={[
+            styles.habitCard,
+            { backgroundColor: colors.card },
+            !isEditable && { opacity: 0.7 }
+          ]}
+          onPress={onToggle}
+          activeOpacity={0.7}
+          disabled={!isEditable}
+        >
+          {/* Icon */}
+          <View style={[
+            styles.iconContainer,
+            { backgroundColor: icon.color + '20' }
+          ]}>
+            <Ionicons name={icon.name as any} size={24} color={icon.color} />
+          </View>
+
+          {/* Habit Info */}
+          <View style={styles.habitInfo}>
+            <Text 
+              style={[
+                styles.habitName,
+                { 
+                  color: colors.text,
+                  textDecorationLine: isCompleted ? 'line-through' : 'none',
+                  opacity: isCompleted ? 0.6 : 1
+                }
+              ]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {habit.name}
+            </Text>
+            {habit.description && (
+              <Text style={[styles.habitDescription, { color: colors.secondary }]} numberOfLines={1}>
+                {habit.description}
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 }
@@ -224,6 +309,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  habitCardWrapper: {
+    flex: 1,
+    minWidth: 0, // Important for flex children to shrink properly
+  },
   habitCard: {
     flex: 1,
     flexDirection: 'row',
@@ -238,6 +327,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    minWidth: 0, // Important for flex children to shrink properly
   },
   iconContainer: {
     width: 48,
@@ -250,6 +340,7 @@ const styles = StyleSheet.create({
   habitInfo: {
     flex: 1,
     marginRight: 8,
+    minWidth: 0, // Important for flex children to shrink properly
   },
   habitName: {
     fontSize: 16,
@@ -257,24 +348,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   habitDescription: {
-    fontSize: 12,
-  },
-  goalTag: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  habitMeta: {
-    alignItems: 'flex-end',
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
     fontSize: 12,
   },
 });

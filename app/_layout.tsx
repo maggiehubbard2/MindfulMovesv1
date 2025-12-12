@@ -1,6 +1,5 @@
 import '@/config/firebase'; // Initialize Firebase
 import { AuthProvider } from '@/context/AuthContext';
-import { GoalsProvider } from '@/context/GoalsContext';
 import { HabitsProvider } from '@/context/HabitsContext';
 import { TasksProvider } from '@/context/TasksContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
@@ -42,11 +41,9 @@ export default function RootLayout() {
     <ThemeProvider>
       <AuthProvider>
         <TasksProvider>
-          <GoalsProvider>
-            <HabitsProvider>
-              <RootLayoutNav />
-            </HabitsProvider>
-          </GoalsProvider>
+          <HabitsProvider>
+            <RootLayoutNav />
+          </HabitsProvider>
         </TasksProvider>
       </AuthProvider>
     </ThemeProvider>

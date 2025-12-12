@@ -99,7 +99,7 @@ export default function ReminderCard({ onSetReminder }: ReminderCardProps) {
         identifier: 'daily-habit-reminder',
         content: {
           title: 'Time for your habits! 🌟',
-          body: 'Don\'t forget to complete your daily habits and move closer to your goals!',
+          body: 'Don\'t forget to complete your daily habits!',
           sound: true,
           priority: Notifications.AndroidNotificationPriority.HIGH,
         },

@@ -8,33 +8,54 @@ interface Habit {
   id: string;
   name: string;
   description?: string;
-  completed: boolean;
+  completed: boolean; // Current day completion status
   userId: string;
   createdAt: Date;
-  completedAt?: Date;
-  goalId?: string;
+  completedAt?: Date; // Last completion timestamp
+  completionDates: string[]; // Array of ISO date strings (YYYY-MM-DD) when habit was completed
 }
 
 interface HabitsContextType {
   habits: Habit[];
-  addHabit: (name: string, description?: string, goalId?: string) => Promise<void>;
-  updateHabit: (id: string, name: string, description?: string, goalId?: string) => Promise<void>;
-  toggleHabit: (id: string) => Promise<void>;
+  selectedDate: Date;
+  setSelectedDate: (date: Date) => void;
+  addHabit: (name: string, description?: string) => Promise<void>;
+  updateHabit: (id: string, name: string, description?: string) => Promise<void>;
+  toggleHabit: (id: string, date?: Date) => Promise<void>;
   removeHabit: (id: string) => Promise<void>;
+  reorderHabits: (fromIndex: number, toIndex: number) => Promise<void>;
+  getHabitsForDate: (date: Date) => Habit[];
+  canEditDate: (date: Date) => boolean;
+  resetHabitsForNewDay: () => Promise<void>;
 }
 
 const HabitsContext = createContext<HabitsContextType | undefined>(undefined);
 
 export function HabitsProvider({ children }: { children: React.ReactNode }) {
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const { user } = useAuth();
 
   // Load habits from Firestore when user is authenticated
   useEffect(() => {
     if (user) {
       loadHabitsFromFirestore();
+      checkAndResetHabits();
     } else {
       setHabits([]);
+    }
+  }, [user]);
+
+  // Check for midnight reset on mount and when date changes
+  useEffect(() => {
+    if (user) {
+      checkAndResetHabits();
+      // Set up interval to check for midnight reset every minute
+      const interval = setInterval(() => {
+        checkAndResetHabits();
+      }, 60000); // Check every minute
+      
+      return () => clearInterval(interval);
     }
   }, [user]);
 
@@ -50,29 +71,88 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       const querySnapshot = await getDocs(habitsQuery);
       const firestoreHabits: Habit[] = querySnapshot.docs.map(docSnapshot => {
         const data = docSnapshot.data();
+        const today = new Date().toISOString().split('T')[0];
+        const completionDates = data.completionDates || [];
+        const isCompletedToday = completionDates.includes(today);
+        
         return {
           id: docSnapshot.id,
           name: data.name,
           description: data.description,
-          completed: data.completed || false,
+          completed: isCompletedToday,
           userId: data.userId,
           createdAt: data.createdAt?.toDate() || new Date(),
           completedAt: data.completedAt?.toDate(),
-          goalId: data.goalId || undefined,
+          completionDates: completionDates,
         };
       });
       
-      setHabits(firestoreHabits);
+      // Sort by createdAt to maintain consistent order (oldest first)
+      // This will be the default order if no custom order is set
+      const sortedHabits = firestoreHabits.sort((a, b) => 
+        a.createdAt.getTime() - b.createdAt.getTime()
+      );
+      
+      setHabits(sortedHabits);
     } catch (error) {
       // Fall back to local storage if Firestore fails
       const savedHabits = await AsyncStorage.getItem('habits');
       if (savedHabits) {
-        setHabits(JSON.parse(savedHabits));
+        const parsed = JSON.parse(savedHabits);
+        // Ensure completionDates exists for backward compatibility
+        const habitsWithDates = parsed.map((h: any) => ({
+          ...h,
+          completionDates: h.completionDates || [],
+        }));
+        setHabits(habitsWithDates);
       }
     }
   };
 
-  const addHabit = async (name: string, description?: string, goalId?: string) => {
+  // Check if we need to reset habits for a new day
+  const checkAndResetHabits = async () => {
+    if (!user) return;
+    
+    const lastResetDate = await AsyncStorage.getItem('lastHabitResetDate');
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (lastResetDate !== today) {
+      await resetHabitsForNewDay();
+      await AsyncStorage.setItem('lastHabitResetDate', today);
+    }
+  };
+
+  // Reset habits for new day - archive completions but keep habit definitions
+  const resetHabitsForNewDay = async () => {
+    if (!user) return;
+    
+    // Update all habits to reset completed status for today
+    const today = new Date().toISOString().split('T')[0];
+    const updatedHabits = habits.map(habit => ({
+      ...habit,
+      completed: false,
+      // Keep completionDates array for historical tracking
+    }));
+
+    // Update in Firestore
+    try {
+      const updatePromises = updatedHabits.map(habit =>
+        updateDoc(doc(db, 'habit', habit.id), {
+          completed: false,
+        }).catch(() => {
+          // Continue even if individual update fails
+        })
+      );
+      await Promise.all(updatePromises);
+    } catch (error) {
+      console.error('Error resetting habits in Firestore:', error);
+    }
+
+    setHabits(updatedHabits);
+    await AsyncStorage.setItem('habits', JSON.stringify(updatedHabits));
+  };
+
+  const addHabit = async (name: string, description?: string) => {
     if (!user) return;
     
     try {
@@ -82,7 +162,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         completed: false,
         userId: user.uid,
         createdAt: new Date(),
-        goalId: goalId || null,
+        completionDates: [],
       };
       
       // Add to Firestore
@@ -92,7 +172,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       const newHabit: Habit = {
         id: docRef.id,
         ...habitData,
-        goalId: goalId || undefined,
+        completionDates: [],
       };
       
       setHabits([...habits, newHabit]);
@@ -108,7 +188,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         completed: false,
         userId: user.uid,
         createdAt: new Date(),
-        goalId,
+        completionDates: [],
       };
       const newHabits = [...habits, newHabit];
       setHabits(newHabits);
@@ -116,7 +196,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateHabit = async (id: string, name: string, description?: string, goalId?: string) => {
+  const updateHabit = async (id: string, name: string, description?: string) => {
     const habitToUpdate = habits.find(habit => habit.id === id);
     if (!habitToUpdate) return;
 
@@ -124,7 +204,8 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       ...habitToUpdate,
       name,
       description,
-      goalId: goalId || undefined,
+      // Preserve completionDates
+      completionDates: habitToUpdate.completionDates || [],
     };
 
     // Update in Firestore
@@ -132,7 +213,6 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       await updateDoc(doc(db, 'habit', id), {
         name,
         description: description || null,
-        goalId: goalId || null,
       });
     } catch (error) {
       // Firestore update failed, continue with local update
@@ -144,24 +224,41 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
   };
 
-  const toggleHabit = async (id: string) => {
+  const toggleHabit = async (id: string, date?: Date) => {
     const habitToUpdate = habits.find(habit => habit.id === id);
     if (!habitToUpdate) return;
 
-    const completed = !habitToUpdate.completed;
-    const completedAt = completed ? new Date() : undefined;
+    const targetDate = date || selectedDate;
+    const dateStr = targetDate.toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Check if we can edit this date
+    if (!canEditDate(targetDate)) {
+      return; // Silently fail if date is not editable
+    }
+
+    const completionDates = habitToUpdate.completionDates || [];
+    const isCompleted = completionDates.includes(dateStr);
+    const newCompletionDates = isCompleted
+      ? completionDates.filter(d => d !== dateStr)
+      : [...completionDates, dateStr];
+
+    const completed = dateStr === today ? !isCompleted : isCompleted;
+    const completedAt = !isCompleted ? new Date() : undefined;
 
     const updatedHabit = {
       ...habitToUpdate,
-      completed,
+      completed: dateStr === today ? completed : habitToUpdate.completed,
       completedAt,
+      completionDates: newCompletionDates,
     };
 
     // Update in Firestore
     try {
       await updateDoc(doc(db, 'habit', id), {
-        completed,
+        completed: dateStr === today ? completed : habitToUpdate.completed,
         completedAt: completedAt || null,
+        completionDates: newCompletionDates,
       });
     } catch (error) {
       // Firestore update failed, continue with local update
@@ -171,6 +268,37 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     const newHabits = habits.map((habit) => habit.id === id ? updatedHabit : habit);
     setHabits(newHabits);
     await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
+  };
+
+  // Get habits for a specific date (with completion status for that date)
+  const getHabitsForDate = (date: Date): Habit[] => {
+    const dateStr = date.toISOString().split('T')[0];
+    return habits.map(habit => {
+      const isCompleted = (habit.completionDates || []).includes(dateStr);
+      return {
+        ...habit,
+        completed: isCompleted,
+      };
+    });
+  };
+
+  // Check if a date can be edited (only up to 2 days prior, no future dates)
+  const canEditDate = (date: Date): boolean => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+    
+    // Cannot edit future dates
+    if (targetDate > today) {
+      return false;
+    }
+    
+    // Can edit today and up to 2 days prior
+    const twoDaysAgo = new Date(today);
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    
+    return targetDate >= twoDaysAgo;
   };
 
   const removeHabit = async (id: string) => {
@@ -187,8 +315,34 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
   };
 
+  const reorderHabits = async (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    
+    const newHabits = [...habits];
+    const [movedHabit] = newHabits.splice(fromIndex, 1);
+    newHabits.splice(toIndex, 0, movedHabit);
+    
+    setHabits(newHabits);
+    await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
+    
+    // Note: We don't persist order to Firestore for now since it's a UI preference
+    // If needed, we could add an 'order' field to each habit document
+  };
+
   return (
-    <HabitsContext.Provider value={{ habits, addHabit, updateHabit, toggleHabit, removeHabit }}>
+    <HabitsContext.Provider value={{ 
+      habits, 
+      selectedDate,
+      setSelectedDate,
+      addHabit, 
+      updateHabit, 
+      toggleHabit, 
+      removeHabit,
+      reorderHabits,
+      getHabitsForDate,
+      canEditDate,
+      resetHabitsForNewDay,
+    }}>
       {children}
     </HabitsContext.Provider>
   );

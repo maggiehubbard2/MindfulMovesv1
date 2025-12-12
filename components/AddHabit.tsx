@@ -1,4 +1,3 @@
-import { useGoals } from '@/context/GoalsContext';
 import { useTheme } from '@/context/ThemeContext';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -8,25 +7,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from './ThemedText';
 
 interface AddHabitProps {
-  onAddHabit: (name: string, description?: string, goalId?: string) => void;
+  onAddHabit: (name: string, description?: string) => void;
 }
 
 export default function AddHabit({ onAddHabit }: AddHabitProps) {
   const { colors, isDarkMode } = useTheme();
-  const { goals } = useGoals();
   const [habitName, setHabitName] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedGoalId, setSelectedGoalId] = useState<string | undefined>();
-  const [isGoalSelectorVisible, setIsGoalSelectorVisible] = useState(false);
-
-  const selectedGoal = goals.find((goal) => goal.id === selectedGoalId);
 
   const handleAddHabit = () => {
     if (habitName.trim()) {
-      onAddHabit(habitName.trim(), description.trim() || undefined, selectedGoalId);
+      onAddHabit(habitName.trim(), description.trim() || undefined);
       setHabitName('');
       setDescription('');
-      setSelectedGoalId(undefined);
       Keyboard.dismiss();
       router.replace('/(tabs)/habits');
     }
@@ -76,33 +69,6 @@ export default function AddHabit({ onAddHabit }: AddHabitProps) {
           numberOfLines={3}
         />
 
-        <View style={styles.goalSelectorContainer}>
-          <Text style={[styles.sectionLabel, { color: colors.secondary }]}>Link to a goal (optional)</Text>
-          <TouchableOpacity
-            style={[
-              styles.goalSelector,
-              { 
-                borderColor: colors.border,
-                backgroundColor: colors.card,
-              },
-            ]}
-            onPress={() => setIsGoalSelectorVisible(true)}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.goalSelectorText, { color: selectedGoal ? colors.text : colors.secondary }]}>
-              {selectedGoal ? selectedGoal.title : goals.length ? 'Select a goal' : 'No goals yet'}
-            </Text>
-          </TouchableOpacity>
-          {selectedGoal && (
-            <TouchableOpacity
-              onPress={() => setSelectedGoalId(undefined)}
-              style={styles.clearGoalButton}
-            >
-              <Text style={[styles.clearGoalText, { color: colors.primary }]}>Clear goal</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
         <TouchableOpacity
           style={[styles.addButton, { 
             backgroundColor: habitName.trim() ? colors.primary : colors.border,
@@ -114,69 +80,6 @@ export default function AddHabit({ onAddHabit }: AddHabitProps) {
           <ThemedText style={styles.addButtonText}>Add Habit</ThemedText>
         </TouchableOpacity>
       </View>
-
-      <Modal
-        visible={isGoalSelectorVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setIsGoalSelectorVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Choose a goal</Text>
-            <ScrollView style={styles.modalList}>
-              {goals.length === 0 && (
-                <View style={styles.emptyGoalsContainer}>
-                  <Text style={[styles.emptyGoalsText, { color: colors.secondary }]}>
-                    You haven't created any goals yet.
-                  </Text>
-                  <TouchableOpacity
-                    style={[styles.createGoalButton, { borderColor: colors.primary }]}
-                    onPress={() => {
-                      setIsGoalSelectorVisible(false);
-                      router.push('/(tabs)/addgoal');
-                    }}
-                  >
-                    <Text style={[styles.createGoalText, { color: colors.primary }]}>Create a goal</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              {goals.map((goal) => {
-                const isActive = goal.id === selectedGoalId;
-                return (
-                  <TouchableOpacity
-                    key={goal.id}
-                    style={[
-                      styles.goalItem,
-                      {
-                        borderColor: isActive ? colors.primary : colors.border,
-                        backgroundColor: isActive ? colors.primary + '15' : colors.card,
-                      },
-                    ]}
-                    onPress={() => {
-                      setSelectedGoalId(goal.id);
-                      setIsGoalSelectorVisible(false);
-                    }}
-                  >
-                    <Text style={[styles.goalTitle, { color: colors.text }]}>{goal.title}</Text>
-                    {goal.why && (
-                      <Text style={[styles.goalWhyText, { color: colors.secondary }]} numberOfLines={2}>
-                        {goal.why}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <TouchableOpacity
-              style={[styles.modalCloseButton, { backgroundColor: colors.primary }]}
-              onPress={() => setIsGoalSelectorVisible(false)}
-            >
-              <Text style={styles.modalCloseText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -243,95 +146,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   addButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  goalSelectorContainer: {
-    gap: 8,
-  },
-  sectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  goalSelector: {
-    height: 48,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-  },
-  goalSelectorText: {
-    fontSize: 16,
-  },
-  clearGoalButton: {
-    alignSelf: 'flex-start',
-  },
-  clearGoalText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalContent: {
-    borderRadius: 16,
-    padding: 20,
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  modalList: {
-    maxHeight: 300,
-  },
-  goalItem: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  goalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  goalWhyText: {
-    fontSize: 14,
-  },
-  emptyGoalsText: {
-    fontSize: 14,
-    marginBottom: 16,
-  },
-  emptyGoalsContainer: {
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
-  createGoalButton: {
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  createGoalText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  modalCloseButton: {
-    marginTop: 12,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  modalCloseText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',

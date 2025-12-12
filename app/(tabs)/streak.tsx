@@ -1,6 +1,8 @@
 import MonthCalendar from '@/components/MonthCalendar';
 import { useAuth } from '@/context/AuthContext';
+import { useHabits } from '@/context/HabitsContext';
 import { useTheme } from '@/context/ThemeContext';
+import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -9,10 +11,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function StreakScreen() {
   const { colors, isDarkMode } = useTheme();
   const { userProfile } = useAuth();
+  const { setSelectedDate } = useHabits();
 
   const handleDatePress = (date: Date) => {
-    // TODO: Could show detailed breakdown of habits for that day
-    console.log('Date pressed:', date.toISOString().split('T')[0]);
+    // Navigate to habits screen with the selected date
+    setSelectedDate(date);
+    router.push('/(tabs)/habits');
   };
 
   return (

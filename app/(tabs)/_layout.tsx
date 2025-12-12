@@ -83,32 +83,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="goals"
-        options={{
-          title: 'Goals',
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="flag-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="addgoal"
-        options={{
-          title: 'Add Goal',
-          headerShown: true,
-          headerTitle: 'Create Goal',
-          headerStyle: {
-            backgroundColor: navigationBackground,
-          },
-          headerTintColor: navigationText,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="flag" size={size} color={color} />
-          ),
-          href: null,
-        }}
-      />
-      <Tabs.Screen
         name="streak"
         options={{
           title: 'Progress',

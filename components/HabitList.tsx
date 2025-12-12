@@ -1,58 +1,260 @@
-import { useGoals } from '@/context/GoalsContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Keyboard, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
+import Animated, {
+  useAnimatedGestureHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withSequence,
+  withTiming,
+  runOnJS,
+} from 'react-native-reanimated';
 
 interface Habit {
   id: string;
   name: string;
   description?: string;
   completed: boolean;
-  goalId?: string;
 }
 
 interface HabitListProps {
   habits: Habit[];
   onToggleHabit: (id: string) => void;
   onRemoveHabit: (id: string) => void;
-  onUpdateHabit: (id: string, name: string, description?: string, goalId?: string) => void;
+  onUpdateHabit: (id: string, name: string, description?: string) => void;
+  onReorderHabits?: (fromIndex: number, toIndex: number) => void;
+  isEditable?: boolean;
 }
 
-export default function HabitList({ habits, onToggleHabit, onRemoveHabit, onUpdateHabit }: HabitListProps) {
+interface AnimatedHabitItemProps {
+  habit: Habit;
+  colors: any;
+  isEditable: boolean;
+  onToggleHabit: (id: string) => void;
+  onEditHabit: (habit: Habit) => void;
+  renderRightActions: (id: string) => React.ReactNode;
+}
+
+interface DraggableHabitItemProps extends AnimatedHabitItemProps {
+  index: number;
+  onReorder: (fromIndex: number, toIndex: number) => void;
+  draggedIndex: number | null;
+  setDraggedIndex: (index: number | null) => void;
+}
+
+function DraggableHabitItem({ 
+  habit, 
+  index,
+  colors, 
+  isEditable, 
+  onToggleHabit, 
+  onEditHabit, 
+  onReorder,
+  renderRightActions,
+  draggedIndex,
+  setDraggedIndex,
+  totalHabits,
+}: DraggableHabitItemProps & { totalHabits: number }) {
+  const translateY = useSharedValue(0);
+  const itemHeight = useSharedValue(0);
+  const [itemLayout, setItemLayout] = useState({ y: 0, height: 0 });
+
+  const gestureHandler = useAnimatedGestureHandler({
+    onStart: (_, ctx: any) => {
+      ctx.startY = translateY.value;
+      runOnJS(setDraggedIndex)(index);
+    },
+    onActive: (event, ctx) => {
+      translateY.value = ctx.startY + event.translationY;
+    },
+    onEnd: (event) => {
+      // Calculate new index based on translation
+      const itemHeight = itemLayout.height || 80; // fallback height
+      const deltaIndex = Math.round(event.translationY / itemHeight);
+      const newIndex = index + deltaIndex;
+      const clampedIndex = Math.max(0, Math.min(totalHabits - 1, newIndex));
+      
+      if (clampedIndex !== index) {
+        runOnJS(onReorder)(index, clampedIndex);
+      }
+      
+      translateY.value = withSpring(0);
+      runOnJS(setDraggedIndex)(null);
+    },
+  });
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const isDragging = draggedIndex === index;
+    return {
+      transform: [{ translateY: translateY.value }],
+      zIndex: isDragging ? 1000 : 1,
+      opacity: isDragging ? 0.9 : 1,
+    };
+  });
+
+  return (
+    <Animated.View
+      style={animatedStyle}
+      onLayout={(event) => {
+        const { y, height } = event.nativeEvent.layout;
+        setItemLayout({ y, height });
+        itemHeight.value = height;
+      }}
+    >
+      <PanGestureHandler
+        onGestureEvent={gestureHandler}
+        enabled={isEditable}
+        activeOffsetY={[-10, 10]}
+      >
+        <Animated.View>
+          <AnimatedHabitItem
+            habit={habit}
+            colors={colors}
+            isEditable={isEditable}
+            onToggleHabit={onToggleHabit}
+            onEditHabit={onEditHabit}
+            renderRightActions={renderRightActions}
+          />
+        </Animated.View>
+      </PanGestureHandler>
+    </Animated.View>
+  );
+}
+
+function AnimatedHabitItem({ habit, colors, isEditable, onToggleHabit, onEditHabit, renderRightActions }: AnimatedHabitItemProps) {
+  const scale = useSharedValue(1);
+  const checkmarkScale = useSharedValue(0);
+  const opacity = useSharedValue(0);
+  const [wasCompleted, setWasCompleted] = useState(habit.completed);
+
+  useEffect(() => {
+    if (habit.completed && !wasCompleted) {
+      // Animate when just completed
+      scale.value = withSequence(
+        withSpring(1.2, { damping: 8, stiffness: 200 }),
+        withSpring(1, { damping: 8, stiffness: 200 })
+      );
+      checkmarkScale.value = withSequence(
+        withTiming(0, { duration: 0 }),
+        withSpring(1, { damping: 8, stiffness: 200 })
+      );
+      opacity.value = withSequence(
+        withTiming(1, { duration: 200 }),
+        withTiming(0, { duration: 300, delay: 200 })
+      );
+    } else if (!habit.completed) {
+      // Reset when unchecked
+      checkmarkScale.value = withTiming(0, { duration: 150 });
+    }
+    setWasCompleted(habit.completed);
+  }, [habit.completed]);
+
+  const animatedCheckboxStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const animatedCheckmarkStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: checkmarkScale.value }],
+  }));
+
+  const animatedRippleStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value * 1.5 }],
+  }));
+
+  return (
+    <Swipeable
+      renderRightActions={() => renderRightActions(habit.id)}
+    >
+      <View style={[styles.habitItem, { backgroundColor: colors.card }]}>
+        {isEditable && (
+          <View style={styles.dragHandle}>
+            <Ionicons name="reorder-three-outline" size={24} color={colors.secondary} />
+          </View>
+        )}
+        <View style={styles.habitInfo}>
+          <View style={styles.habitDetails}>
+            <Text style={[styles.habitName, { color: colors.text }]}>{habit.name}</Text>
+            {habit.description && (
+              <Text style={[styles.descriptionText, { color: colors.secondary }]}>
+                {habit.description}
+              </Text>
+            )}
+          </View>
+        </View>
+        <View style={styles.habitActions}>
+          {isEditable && (
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={() => onEditHabit(habit)}
+            >
+              <Ionicons name="pencil" size={20} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[
+              styles.checkbox,
+              habit.completed && { backgroundColor: colors.primary },
+              !isEditable && { opacity: 0.5 }
+            ]}
+            onPress={() => isEditable && onToggleHabit(habit.id)}
+            disabled={!isEditable}
+          >
+            <Animated.View style={[styles.checkboxInner, animatedCheckboxStyle]}>
+              {habit.completed && (
+                <>
+                  <Animated.View
+                    style={[
+                      styles.ripple,
+                      { backgroundColor: colors.primary },
+                      animatedRippleStyle,
+                    ]}
+                  />
+                  <Animated.View style={animatedCheckmarkStyle}>
+                    <Ionicons name="checkmark" size={20} color="white" />
+                  </Animated.View>
+                </>
+              )}
+            </Animated.View>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Swipeable>
+  );
+}
+
+export default function HabitList({ habits, onToggleHabit, onRemoveHabit, onUpdateHabit, onReorderHabits, isEditable = true }: HabitListProps) {
   const { colors } = useTheme();
-  const { goals } = useGoals();
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
-  const [editGoalId, setEditGoalId] = useState<string | undefined>();
-  const [isGoalSelectorVisible, setIsGoalSelectorVisible] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const handleEditHabit = (habit: Habit) => {
     setEditingHabit(habit);
     setEditName(habit.name);
     setEditDescription(habit.description || '');
-    setEditGoalId(habit.goalId);
   };
 
   const handleSaveEdit = () => {
     if (editingHabit && editName.trim()) {
-      onUpdateHabit(editingHabit.id, editName.trim(), editDescription.trim() || undefined, editGoalId);
+      onUpdateHabit(editingHabit.id, editName.trim(), editDescription.trim() || undefined);
       setEditingHabit(null);
       setEditName('');
       setEditDescription('');
-      setEditGoalId(undefined);
       Keyboard.dismiss();
     }
   };
 
-  const selectedGoal = goals.find((goal) => goal.id === editGoalId);
-
   const renderRightActions = (id: string) => {
+    if (!isEditable) return null;
+    
     return (
       <TouchableOpacity
         style={[styles.deleteAction, { backgroundColor: colors.primary }]}
@@ -82,54 +284,33 @@ export default function HabitList({ habits, onToggleHabit, onRemoveHabit, onUpda
     );
   }
 
+  const handleReorder = (fromIndex: number, toIndex: number) => {
+    if (onReorderHabits && fromIndex !== toIndex) {
+      onReorderHabits(fromIndex, toIndex);
+    }
+  };
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="auto" />
         <View style={styles.container}>
           <ScrollView style={styles.habitList}>
-            {habits.map((habit) => (
-              <Swipeable
+            {habits.map((habit, index) => (
+              <DraggableHabitItem
                 key={habit.id}
-                renderRightActions={() => renderRightActions(habit.id)}
-              >
-                <View style={[styles.habitItem, { backgroundColor: colors.card }]}>
-                  <View style={styles.habitInfo}>
-                    <View style={styles.habitDetails}>
-                      <Text style={[styles.habitName, { color: colors.text }]}>{habit.name}</Text>
-                      {habit.description && (
-                        <Text style={[styles.descriptionText, { color: colors.secondary }]}>
-                          {habit.description}
-                        </Text>
-                      )}
-                      {habit.goalId && (
-                        <Text style={[styles.goalBadge, { color: colors.primary }]}>
-                          Linked goal: {goals.find((goal) => goal.id === habit.goalId)?.title ?? 'Unknown goal'}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                  <View style={styles.habitActions}>
-                    <TouchableOpacity
-                      style={styles.editButton}
-                      onPress={() => handleEditHabit(habit)}
-                    >
-                      <Ionicons name="pencil" size={20} color={colors.primary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.checkbox,
-                        habit.completed && { backgroundColor: colors.primary }
-                      ]}
-                      onPress={() => onToggleHabit(habit.id)}
-                    >
-                      {habit.completed && (
-                        <Ionicons name="checkmark" size={20} color="white" />
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </Swipeable>
+                habit={habit}
+                index={index}
+                colors={colors}
+                isEditable={isEditable}
+                onToggleHabit={onToggleHabit}
+                onEditHabit={handleEditHabit}
+                onReorder={handleReorder}
+                renderRightActions={renderRightActions}
+                draggedIndex={draggedIndex}
+                setDraggedIndex={setDraggedIndex}
+                totalHabits={habits.length}
+              />
             ))}
           </ScrollView>
         </View>
@@ -151,7 +332,6 @@ export default function HabitList({ habits, onToggleHabit, onRemoveHabit, onUpda
                   setEditingHabit(null);
                   setEditName('');
                   setEditDescription('');
-                  setEditGoalId(undefined);
                 }}
                 style={styles.closeButton}
               >
@@ -183,27 +363,6 @@ export default function HabitList({ habits, onToggleHabit, onRemoveHabit, onUpda
                   numberOfLines={3}
                 />
               </View>
-
-              <View style={styles.inputSection}>
-                <Text style={[styles.inputLabel, { color: colors.text }]}>Link to a goal (optional)</Text>
-                <TouchableOpacity
-                  style={[styles.goalSelector, { borderColor: colors.border, backgroundColor: colors.card }]}
-                  onPress={() => setIsGoalSelectorVisible(true)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.goalSelectorText, { color: selectedGoal ? colors.text : colors.secondary }]}>
-                    {selectedGoal ? selectedGoal.title : goals.length ? 'Select a goal' : 'No goals yet'}
-                  </Text>
-                </TouchableOpacity>
-                {selectedGoal && (
-                  <TouchableOpacity
-                    onPress={() => setEditGoalId(undefined)}
-                    style={styles.clearGoalButton}
-                  >
-                    <Text style={[styles.clearGoalText, { color: colors.primary }]}>Clear goal</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
             </ScrollView>
 
             <View style={styles.modalButtonContainer}>
@@ -213,7 +372,6 @@ export default function HabitList({ habits, onToggleHabit, onRemoveHabit, onUpda
                   setEditingHabit(null);
                   setEditName('');
                   setEditDescription('');
-                  setEditGoalId(undefined);
                 }}
               >
                 <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
@@ -228,61 +386,6 @@ export default function HabitList({ habits, onToggleHabit, onRemoveHabit, onUpda
             </View>
           </View>
         </View>
-
-        {/* Goal Selector Modal */}
-        <Modal
-          visible={isGoalSelectorVisible}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setIsGoalSelectorVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Choose a goal</Text>
-              <ScrollView style={styles.modalList}>
-                {goals.length === 0 && (
-                  <View style={styles.emptyGoalsContainer}>
-                    <Text style={[styles.emptyGoalsText, { color: colors.secondary }]}>
-                      You haven't created any goals yet.
-                    </Text>
-                  </View>
-                )}
-                {goals.map((goal) => {
-                  const isActive = goal.id === editGoalId;
-                  return (
-                    <TouchableOpacity
-                      key={goal.id}
-                      style={[
-                        styles.goalItem,
-                        {
-                          borderColor: isActive ? colors.primary : colors.border,
-                          backgroundColor: isActive ? colors.primary + '15' : colors.card,
-                        },
-                      ]}
-                      onPress={() => {
-                        setEditGoalId(goal.id);
-                        setIsGoalSelectorVisible(false);
-                      }}
-                    >
-                      <Text style={[styles.goalTitle, { color: colors.text }]}>{goal.title}</Text>
-                      {goal.why && (
-                        <Text style={[styles.goalWhyText, { color: colors.secondary }]} numberOfLines={2}>
-                          {goal.why}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: colors.primary }]}
-                onPress={() => setIsGoalSelectorVisible(false)}
-              >
-                <Text style={styles.modalButtonText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
       </Modal>
     </GestureHandlerRootView>
   );
@@ -336,6 +439,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  dragHandle: {
+    marginRight: 12,
+    padding: 4,
+  },
   habitInfo: {
     flex: 1,
     flexDirection: 'row',
@@ -348,13 +455,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
-  },
-  goalBadge: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   descriptionText: {
     fontSize: 14,
@@ -371,6 +471,20 @@ const styles = StyleSheet.create({
     borderColor: '#cfcfcf',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
+  },
+  checkboxInner: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ripple: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    opacity: 0.3,
   },
   deleteAction: {
     justifyContent: 'center',
@@ -444,25 +558,6 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
     minHeight: 80,
   },
-  goalSelector: {
-    height: 48,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  goalSelectorText: {
-    fontSize: 16,
-  },
-  clearGoalButton: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
-  },
-  clearGoalText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
   modalButtonContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -478,33 +573,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
-  },
-  modalList: {
-    maxHeight: 300,
-    marginBottom: 16,
-  },
-  goalItem: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 12,
-  },
-  goalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  goalWhyText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  emptyGoalsContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  emptyGoalsText: {
-    fontSize: 14,
-    textAlign: 'center',
   },
 });
 
