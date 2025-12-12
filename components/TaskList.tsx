@@ -1,6 +1,5 @@
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -44,16 +43,8 @@ export default function TaskList({ tasks, showEmojis, onToggleTask, onRemoveTask
       <View style={styles.emptyContainer}>
         <Ionicons name="list" size={64} color={colors.primary} />
         <Text style={[styles.emptyText, { color: colors.text }]}>
-          No tasks yet. Add your first task!
+          No tasks yet. Tasks feature coming soon!
         </Text>
-        <View style={{ height: 20 }} />
-
-        <Link href="/add" asChild>
-          <TouchableOpacity style={styles.addFirstButton}>
-            <Ionicons name="add" size={24} color="white" />
-            <Text style={styles.addFirstButtonText}>Add Your First Task</Text>
-          </TouchableOpacity>
-        </Link>
       </View>
     );
   }
@@ -107,7 +98,7 @@ export default function TaskList({ tasks, showEmojis, onToggleTask, onRemoveTask
     </GestureHandlerRootView>
   );
 }
-
+ // STYLING
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,

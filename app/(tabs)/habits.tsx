@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HabitsScreen() {
@@ -79,7 +79,7 @@ export default function HabitsScreen() {
             {userProfile?.firstName ? `${userProfile.firstName}'s Habits` : 'Your Habits'}
           </Text>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Daily actions to build better habits.
+            You don’t rise to the level of your goals, you fall to your systems.
           </Text>
         </View>
         
