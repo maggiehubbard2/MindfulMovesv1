@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 10,
     fontWeight: '600',
     opacity: 0.7,
   },
