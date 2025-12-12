@@ -13,14 +13,19 @@ Being made with love by [@ItGirlMaggie](https://instagram.com/ItGirlMaggie) 💖
 
 
 
-## 📱 Features to Look Forward To
+## 📱 Features
 
-- ✅ Check off daily habits with a sleek checklist
-- 📆 Visual calendar to track consistency 
-- 🔄 Habit streaks to stay motivated _(coming soon)_
-- 🧘🏽‍♀️ Custom habit creation for your personal goals _(coming soon)_
-- 🌙 Dark mode for night owls _(coming soon)_
-- 🔔 Daily reminders _(coming soon)_
+- ✅ Check off daily habits with a sleek checklist and satisfying animations
+- 📆 Visual calendar to track consistency (weekly & monthly views)
+- 🎯 Custom habit creation with descriptions
+- 📊 Progress tracking with accurate completion percentages
+- 🔄 Drag-and-drop to reorder habits
+- 📱 Smart dashboard that prioritizes unchecked habits
+- 🌙 Dark mode for night owls
+- 🔔 Daily reminders with push notifications
+- 📅 Edit habits for up to 2 days in the past
+- 🎨 Customizable accent colors
+- 👤 User profiles and authentication
 
 ---
 
@@ -28,8 +33,12 @@ Being made with love by [@ItGirlMaggie](https://instagram.com/ItGirlMaggie) 💖
 
 - [React Native](https://reactnative.dev/)
 - [Expo](https://expo.dev/)
-- [React Navigation](https://reactnavigation.org/)
+- [Expo Router](https://docs.expo.dev/router/introduction/) for file-based routing
+- [Firebase](https://firebase.google.com/) for authentication and data storage
+- [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/) for smooth animations
+- [React Native Gesture Handler](https://docs.swmansion.com/react-native-gesture-handler/) for drag-and-drop
 - [AsyncStorage](https://react-native-async-storage.github.io/async-storage/) for offline habit tracking
+- [Expo Notifications](https://docs.expo.dev/versions/latest/sdk/notifications/) for daily reminders
 
 ---
 
