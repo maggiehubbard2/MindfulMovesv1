@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-type AccentColor = 'blue' | 'pink' | 'green' | 'purple';
+type AccentColorKey = 'blue' | 'pink' | 'green' | 'purple' | 'custom';
 
 interface ThemeContextType {
   isDarkMode: boolean;
@@ -14,8 +14,9 @@ interface ThemeContextType {
     primary: string;
     secondary: string;
   };
-  accentColor: AccentColor;
-  setAccentColor: (color: AccentColor) => void;
+  accentColor: AccentColorKey;
+  customAccentColor: string;
+  setAccentColor: (color: AccentColorKey, customColor?: string) => void;
 }
 
 const accentColors = {
@@ -35,7 +36,7 @@ const accentColors = {
     primary: '#AF52DE',
     secondary: '#9C4DCC',
   },
-};
+} satisfies Record<Exclude<AccentColorKey, 'custom'>, { primary: string; secondary: string }>;
 
 const lightColors = {
   background: '#FFFFFF',
@@ -55,7 +56,8 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [accentColor, setAccentColor] = useState<AccentColor>('blue');
+  const [accentColor, setAccentColor] = useState<AccentColorKey>('blue');
+  const [customAccentColor, setCustomAccentColor] = useState<string>('#FF6B6B');
 
   useEffect(() => {
     loadThemePreference();
@@ -65,11 +67,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     try {
       const darkModeValue = await AsyncStorage.getItem('darkMode');
       const accentColorValue = await AsyncStorage.getItem('accentColor');
+      const customAccentColorValue = await AsyncStorage.getItem('customAccentColor');
       if (darkModeValue !== null) {
         setIsDarkMode(JSON.parse(darkModeValue));
       }
       if (accentColorValue !== null) {
-        setAccentColor(accentColorValue as AccentColor);
+        setAccentColor(accentColorValue as AccentColorKey);
+      }
+      if (customAccentColorValue) {
+        setCustomAccentColor(customAccentColorValue);
       }
     } catch (error) {
       console.error('Error loading theme preference:', error);
@@ -86,8 +92,54 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleSetAccentColor = async (color: AccentColor) => {
+  const normalizeHex = (hex: string) => {
+    if (!hex) return '#FF6B6B';
+    let value = hex.trim();
+    if (!value.startsWith('#')) {
+      value = `#${value}`;
+    }
+    if (value.length === 4) {
+      value =
+        '#' +
+        value
+          .slice(1)
+          .split('')
+          .map((char) => char + char)
+          .join('');
+    }
+    return value.slice(0, 7).toUpperCase();
+  };
+
+  const lightenColor = (hex: string, amount = 0.25) => {
+    const normalized = normalizeHex(hex);
+    const bigint = parseInt(normalized.slice(1), 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+
+    const adjust = (channel: number) =>
+      Math.min(255, Math.round(channel + (255 - channel) * amount));
+
+    const newR = adjust(r);
+    const newG = adjust(g);
+    const newB = adjust(b);
+
+    return (
+      '#' +
+      [newR, newG, newB]
+        .map((channel) => channel.toString(16).padStart(2, '0'))
+        .join('')
+        .toUpperCase()
+    );
+  };
+
+  const handleSetAccentColor = async (color: AccentColorKey, customColor?: string) => {
     try {
+      if (color === 'custom') {
+        const normalizedCustom = normalizeHex(customColor || customAccentColor);
+        setCustomAccentColor(normalizedCustom);
+        await AsyncStorage.setItem('customAccentColor', normalizedCustom);
+      }
       setAccentColor(color);
       await AsyncStorage.setItem('accentColor', color);
     } catch (error) {
@@ -95,9 +147,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const accentPalette =
+    accentColor === 'custom'
+      ? {
+          primary: normalizeHex(customAccentColor),
+          secondary: lightenColor(customAccentColor),
+        }
+      : accentColors[accentColor];
+
   const colors = {
     ...(isDarkMode ? darkColors : lightColors),
-    ...accentColors[accentColor],
+    ...accentPalette,
   };
 
   return (
@@ -107,6 +167,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         toggleDarkMode,
         colors,
         accentColor,
+        customAccentColor,
         setAccentColor: handleSetAccentColor,
       }}
     >
