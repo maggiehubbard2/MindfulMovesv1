@@ -34,7 +34,7 @@ Being made with love by [@ItGirlMaggie](https://instagram.com/ItGirlMaggie) 💖
 - [React Native](https://reactnative.dev/)
 - [Expo](https://expo.dev/)
 - [Expo Router](https://docs.expo.dev/router/introduction/) for file-based routing
-- [Firebase](https://firebase.google.com/) for authentication and data storage
+- [Supabase](https://supabase.com/) for authentication and data storage
 - [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/) for smooth animations
 - [React Native Gesture Handler](https://docs.swmansion.com/react-native-gesture-handler/) for drag-and-drop
 - [AsyncStorage](https://react-native-async-storage.github.io/async-storage/) for offline habit tracking

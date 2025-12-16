@@ -1,10 +1,9 @@
-import { db } from '@/config/firebase';
+import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { doc, updateDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -59,11 +58,16 @@ export default function EditProfileScreen() {
 
     setLoading(true);
     try {
-      // Update user document in Firestore
-      await updateDoc(doc(db, 'users', user.uid), {
-        firstName: firstName.trim(),
-        name: firstName.trim(),
-      });
+      // Update user document in Supabase
+      const { error } = await supabase
+        .from('users')
+        .update({
+          first_name: firstName.trim(),
+          name: firstName.trim(),
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
 
       // Refresh the user profile in context
       await refreshUserProfile();

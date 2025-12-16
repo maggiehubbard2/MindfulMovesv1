@@ -2,7 +2,7 @@ import { useHabits } from '@/context/HabitsContext';
 import { useTheme } from '@/context/ThemeContext';
 import { getHabitCompletionForDate } from '@/utils/habitCalendarUtils';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface WeeklyCalendarProps {
@@ -12,6 +12,7 @@ interface WeeklyCalendarProps {
 export default function WeeklyCalendar({ onDatePress }: WeeklyCalendarProps) {
   const { colors } = useTheme();
   const { habits } = useHabits();
+  const [refreshKey, setRefreshKey] = useState(0);
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const today = new Date();
     const day = today.getDay();
@@ -20,6 +21,11 @@ export default function WeeklyCalendar({ onDatePress }: WeeklyCalendarProps) {
     sunday.setHours(0, 0, 0, 0);
     return sunday;
   });
+  
+  // Force recalculation when habits change
+  useEffect(() => {
+    setRefreshKey(prev => prev + 1);
+  }, [habits]);
 
   const getWeekDates = (weekStart: Date): Date[] => {
     const dates: Date[] = [];
@@ -57,10 +63,10 @@ export default function WeeklyCalendar({ onDatePress }: WeeklyCalendarProps) {
            date.getFullYear() === today.getFullYear();
   };
 
-  const getCompletionPercentage = (date: Date): number => {
+  const getCompletionPercentage = useCallback((date: Date): number => {
     // Use the utility function which properly filters habits by creation date
     return getHabitCompletionForDate(habits, date);
-  };
+  }, [habits, refreshKey]);
 
   const weekDates = getWeekDates(currentWeekStart);
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

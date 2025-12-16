@@ -1,6 +1,5 @@
-import { auth, db } from '@/config/firebase';
-import { User, createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { supabase } from '@/config/supabase';
+import { User } from '@supabase/supabase-js';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 interface UserProfile {
@@ -8,7 +7,7 @@ interface UserProfile {
   email: string;
   name: string;
   firstName: string;
-  createdAt: Date;
+  created_at: string;
 }
 
 interface AuthContextType {
@@ -31,40 +30,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error) throw error;
+      
+      if (data) {
         setUserProfile({
-          id: userData.id,
-          email: userData.email,
-          name: userData.name,
-          firstName: userData.firstName,
-          createdAt: userData.createdAt?.toDate() || new Date(),
+          id: data.id,
+          email: data.email,
+          name: data.name,
+          firstName: data.first_name,
+          created_at: data.created_at,
         });
       }
     } catch (error) {
       // Silent error - will retry on next auth state change
+      console.error('Error fetching user profile:', error);
     }
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
-      if (user) {
-        await fetchUserProfile(user.uid);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
       } else {
         setUserProfile(null);
       }
       setLoading(false);
     });
 
-    return unsubscribe;
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        await fetchUserProfile(session.user.id);
+      } else {
+        setUserProfile(null);
+      }
+      setLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) throw error;
+      
+      if (data.user) {
+        await fetchUserProfile(data.user.id);
+      }
+    } catch (error: any) {
       throw error;
     }
   };
@@ -80,22 +109,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Please enter a valid email address');
       }
       
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      // Sign up user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
       
-      // Create user document in Firestore
+      if (authError) throw authError;
+      
+      if (!authData.user) {
+        throw new Error('Failed to create user');
+      }
+      
+      // Create user profile in database
       const userData = {
-        id: user.uid,
+        id: authData.user.id,
         email: email,
         name: firstName,
-        firstName: firstName,
-        createdAt: new Date(),
+        first_name: firstName,
+        created_at: new Date().toISOString(),
       };
       
-      await setDoc(doc(db, 'users', user.uid), userData);
+      const { error: dbError } = await supabase
+        .from('users')
+        .insert([userData]);
+      
+      if (dbError) {
+        // If profile creation fails, we still have the auth user
+        // but we should log the error
+        console.error('Error creating user profile:', dbError);
+      }
       
       // Update local state
-      setUserProfile(userData);
+      setUserProfile({
+        id: userData.id,
+        email: userData.email,
+        name: userData.name,
+        firstName: userData.first_name,
+        created_at: userData.created_at,
+      });
     } catch (error: any) {
       throw error;
     }
@@ -103,7 +155,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await signOut(auth);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
     } catch (error) {
       throw error;
     }
@@ -111,7 +164,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resetPassword = async (email: string) => {
     try {
-      await sendPasswordResetEmail(auth, email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'mindfulmoves://reset-password',
+      });
+      if (error) throw error;
     } catch (error: any) {
       throw error;
     }
@@ -119,7 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUserProfile = async () => {
     if (user) {
-      await fetchUserProfile(user.uid);
+      await fetchUserProfile(user.id);
     }
   };
 

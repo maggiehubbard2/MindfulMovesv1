@@ -3,7 +3,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { getMonthDates } from '@/utils/calendarUtils';
 import { getHabitCompletionForDate, getHabitMonthStats } from '@/utils/habitCalendarUtils';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ProgressCircle from './ProgressCircle';
 
@@ -15,12 +15,21 @@ export default function MonthCalendar({ onDatePress }: MonthCalendarProps) {
   const { colors } = useTheme();
   const { habits } = useHabits();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  // Force recalculation when habits change
+  useEffect(() => {
+    setRefreshKey(prev => prev + 1);
+  }, [habits]);
   
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
   
   const monthDates = getMonthDates(currentYear, currentMonth);
-  const monthStats = getHabitMonthStats(habits, currentYear, currentMonth);
+  const monthStats = useMemo(() => 
+    getHabitMonthStats(habits, currentYear, currentMonth),
+    [habits, currentYear, currentMonth, refreshKey]
+  );
   
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -50,10 +59,10 @@ export default function MonthCalendar({ onDatePress }: MonthCalendarProps) {
            date.getFullYear() === today.getFullYear();
   };
   
-  const getCompletionPercentage = (date: Date) => {
+  const getCompletionPercentage = useCallback((date: Date) => {
     if (!isCurrentMonth(date)) return 0;
     return getHabitCompletionForDate(habits, date);
-  };
+  }, [habits, refreshKey]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

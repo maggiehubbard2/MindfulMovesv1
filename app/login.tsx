@@ -91,10 +91,12 @@ export default function LoginScreen() {
       );
     } catch (error: any) {
       let errorMessage = 'Failed to send reset email';
-      if (error?.code === 'auth/user-not-found') {
+      if (error?.message?.includes('not found') || error?.message?.includes('No account')) {
         errorMessage = 'No account found with this email';
-      } else if (error?.code === 'auth/invalid-email') {
+      } else if (error?.message?.includes('Invalid email') || error?.message?.includes('invalid email')) {
         errorMessage = 'Invalid email address';
+      } else if (error?.message) {
+        errorMessage = error.message;
       }
       Alert.alert('Error', errorMessage);
     }
@@ -119,20 +121,18 @@ export default function LoginScreen() {
         router.replace('/(tabs)/dashboard');
       }
     } catch (error: any) {
-      // Handle specific Firebase errors
+      // Handle specific Supabase errors
       let errorMessage = 'Authentication failed';
-      if (error?.code === 'auth/email-already-in-use') {
+      if (error?.message?.includes('already registered') || error?.message?.includes('User already registered')) {
         setShowEmailExistsModal(true);
         return; // Exit early since we handled this specific error
-      } else if (error?.code === 'auth/invalid-email') {
+      } else if (error?.message?.includes('Invalid email') || error?.message?.includes('invalid email')) {
         errorMessage = 'Invalid email address';
-      } else if (error?.code === 'auth/weak-password') {
-        errorMessage = 'Password is too weak. Please use a stronger password.';
-      } else if (error?.code === 'auth/user-not-found') {
-        errorMessage = 'No account found with this email. Please sign up first.';
-      } else if (error?.code === 'auth/wrong-password' || error?.code === 'auth/invalid-credential') {
-        errorMessage = 'Incorrect password. Please check your password and try again.';
-      } else if (error.message) {
+      } else if (error?.message?.includes('Password')) {
+        errorMessage = error.message;
+      } else if (error?.message?.includes('Invalid login credentials') || error?.message?.includes('Email not confirmed')) {
+        errorMessage = 'Incorrect email or password. Please check your credentials and try again.';
+      } else if (error?.message) {
         errorMessage = error.message;
       }
       

@@ -75,12 +75,22 @@ export default function HabitsScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <StatusBar style={isDarkMode ? 'light' : 'dark'} />
         <View style={[styles.header, { backgroundColor: colors.card }]}>
-          <Text style={[styles.greeting, { color: colors.text }]}>
-            {userProfile?.firstName ? `${userProfile.firstName}'s Habits` : 'Your Habits'}
-          </Text>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            You don’t rise to the level of your goals, you fall to your systems.
-          </Text>
+          <View style={styles.headerTop}>
+            <View style={styles.headerTextContainer}>
+              <Text style={[styles.greeting, { color: colors.text }]}>
+                {userProfile?.firstName ? `${userProfile.firstName}'s Habits` : 'Your Habits'}
+              </Text>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>
+                You don't rise to the level of your goals, you fall to your systems.
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              onPress={() => router.push('/addhabit')}
+            >
+              <Ionicons name="add" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
         </View>
         
         {/* Date Selector */}
@@ -232,6 +242,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0, 0, 0, 0.1)',
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerTextContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
   greeting: {
     fontSize: 28,
     fontWeight: 'bold',
@@ -241,6 +260,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     opacity: 0.7,
+  },
+  addButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   dateSelector: {
     flexDirection: 'row',

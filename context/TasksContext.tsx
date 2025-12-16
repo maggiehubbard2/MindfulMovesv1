@@ -1,7 +1,6 @@
-import { db } from '@/config/firebase';
+import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 export type TaskFrequency = 'one-time' | 'daily' | 'monthly';
@@ -10,14 +9,14 @@ interface Task {
   id: string;
   name: string;
   streak: number;
-  completedToday: boolean;
+  completed_today: boolean;
   emoji: string;
-  lastCompletedDate: string | null; // ISO string of the last completion date
-  userId: string; // Owner of the task
-  createdAt: Date;
-  habitId?: string; // Optional reference to a related habit
+  last_completed_date: string | null; // ISO string of the last completion date
+  user_id: string; // Owner of the task
+  created_at: string;
+  habit_id?: string; // Optional reference to a related habit
   frequency: TaskFrequency; // How often this task should be done
-  completionDates: string[]; // Array of ISO date strings when task was completed
+  completion_dates: string[]; // Array of ISO date strings when task was completed
 }
 
 interface TasksContextType {
@@ -41,10 +40,10 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const { user } = useAuth();
 
-  // Load tasks from Firestore when user is authenticated
+  // Load tasks from Supabase when user is authenticated
   useEffect(() => {
     if (user) {
-      loadTasksFromFirestore();
+      loadTasksFromSupabase();
     } else {
       setTasks([]);
     }
@@ -55,17 +54,17 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     const checkStreaks = () => {
       const today = new Date().toISOString().split('T')[0];
       const newTasks = tasks.map(task => {
-        if (!task.lastCompletedDate) return task;
+        if (!task.last_completed_date) return task;
         
-        const lastDate = new Date(task.lastCompletedDate);
+        const lastDate = new Date(task.last_completed_date);
         const lastDateStr = lastDate.toISOString().split('T')[0];
         
         // If the last completion was not yesterday, reset the streak
-        if (lastDateStr !== today && !task.completedToday) {
+        if (lastDateStr !== today && !task.completed_today) {
           return {
             ...task,
             streak: 0,
-            completedToday: false
+            completed_today: false
           };
         }
         return task;
@@ -109,35 +108,33 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     checkAndResetTasks();
   }, []);
 
-  const loadTasksFromFirestore = async () => {
+  const loadTasksFromSupabase = async () => {
     if (!user) return;
     
     try {
-      const tasksQuery = query(
-        collection(db, 'task'),
-        where('userId', '==', user.uid)
-      );
+      const { data, error } = await supabase
+        .from('task')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
       
-      const querySnapshot = await getDocs(tasksQuery);
+      if (error) throw error;
       
-      const firestoreTasks: Task[] = querySnapshot.docs.map(docSnapshot => {
-        const data = docSnapshot.data();
-        return {
-          id: docSnapshot.id,
-          name: data.name,
-          streak: data.streak || 0,
-          completedToday: data.completedToday || false,
-          emoji: data.emoji,
-          lastCompletedDate: data.lastCompletedDate || null,
-          userId: data.userId,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          habitId: data.habitId,
-          frequency: data.frequency || 'one-time', // Default to 'one-time' for existing tasks
-          completionDates: data.completionDates || [], // Default to empty array for existing tasks
-        };
-      });
+      const supabaseTasks: Task[] = (data || []).map((task: any) => ({
+        id: task.id,
+        name: task.name,
+        streak: task.streak || 0,
+        completed_today: task.completed_today || false,
+        emoji: task.emoji,
+        last_completed_date: task.last_completed_date || null,
+        user_id: task.user_id,
+        created_at: task.created_at,
+        habit_id: task.habit_id,
+        frequency: task.frequency || 'one-time',
+        completion_dates: task.completion_dates || [],
+      }));
       
-      setTasks(firestoreTasks);
+      setTasks(supabaseTasks);
       
       // Also load emoji preference
       const savedShowEmojis = await AsyncStorage.getItem('showEmojis');
@@ -145,7 +142,8 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
         setShowEmojis(JSON.parse(savedShowEmojis));
       }
     } catch (error) {
-      // Fall back to local storage if Firestore fails
+      console.error('Error loading tasks from Supabase:', error);
+      // Fall back to local storage if Supabase fails
       const savedTasks = await AsyncStorage.getItem('tasks');
       if (savedTasks) {
         setTasks(JSON.parse(savedTasks));
@@ -160,23 +158,29 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       const taskData = {
         name,
         streak: 0,
-        completedToday: false,
+        completed_today: false,
         emoji,
-        lastCompletedDate: null,
-        userId: user.uid,
-        createdAt: new Date(),
-        habitId: habitId || undefined,
+        last_completed_date: null,
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+        habit_id: habitId || null,
         frequency,
-        completionDates: [],
+        completion_dates: [],
       };
       
-      // Add to Firestore
-      const docRef = await addDoc(collection(db, 'task'), taskData);
+      // Add to Supabase
+      const { data, error } = await supabase
+        .from('task')
+        .insert([taskData])
+        .select()
+        .single();
+      
+      if (error) throw error;
       
       // Update local state
       const newTask: Task = {
-        id: docRef.id,
-        ...taskData,
+        id: data.id,
+        ...data,
       };
       
       setTasks([...tasks, newTask]);
@@ -184,19 +188,20 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
       // Also save to local storage as backup
       await AsyncStorage.setItem('tasks', JSON.stringify([...tasks, newTask]));
     } catch (error) {
-      // Fallback to local storage if Firestore fails
+      console.error('Error adding task to Supabase:', error);
+      // Fallback to local storage if Supabase fails
       const newTask: Task = {
         id: Date.now().toString(),
         name,
         streak: 0,
-        completedToday: false,
+        completed_today: false,
         emoji,
-        lastCompletedDate: null,
-        userId: user.uid,
-        createdAt: new Date(),
-        habitId: habitId,
+        last_completed_date: null,
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+        habit_id: habitId,
         frequency,
-        completionDates: [],
+        completion_dates: [],
       };
       const newTasks = [...tasks, newTask];
       setTasks(newTasks);
@@ -209,12 +214,12 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     const taskToUpdate = tasks.find(task => task.id === id);
     if (!taskToUpdate) return;
 
-    const completedToday = !taskToUpdate.completedToday;
-    const lastDate = taskToUpdate.lastCompletedDate ? new Date(taskToUpdate.lastCompletedDate) : null;
+    const completedToday = !taskToUpdate.completed_today;
+    const lastDate = taskToUpdate.last_completed_date ? new Date(taskToUpdate.last_completed_date) : null;
     const lastDateStr = lastDate ? lastDate.toISOString().split('T')[0] : null;
     
     let newStreak = taskToUpdate.streak;
-    let newCompletionDates = [...(taskToUpdate.completionDates || [])];
+    let newCompletionDates = [...(taskToUpdate.completion_dates || [])];
     
     if (completedToday) {
       // Add today to completion dates if not already present
@@ -234,22 +239,28 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
 
     const updatedTask = {
       ...taskToUpdate,
-      completedToday,
+      completed_today: completedToday,
       streak: newStreak,
-      lastCompletedDate: completedToday ? today : taskToUpdate.lastCompletedDate,
-      completionDates: newCompletionDates,
+      last_completed_date: completedToday ? today : taskToUpdate.last_completed_date,
+      completion_dates: newCompletionDates,
     };
 
-    // Update in Firestore
+    // Update in Supabase
     try {
-      await updateDoc(doc(db, 'task', id), {
-        completedToday,
-        streak: newStreak,
-        lastCompletedDate: completedToday ? today : taskToUpdate.lastCompletedDate,
-        completionDates: newCompletionDates,
-      });
+      const { error } = await supabase
+        .from('task')
+        .update({
+          completed_today: completedToday,
+          streak: newStreak,
+          last_completed_date: completedToday ? today : taskToUpdate.last_completed_date,
+          completion_dates: newCompletionDates,
+        })
+        .eq('id', id);
+      
+      if (error) throw error;
     } catch (error) {
-      // Firestore update failed, continue with local update
+      console.error('Error updating task in Supabase:', error);
+      // Supabase update failed, continue with local update
     }
 
     // Update local state
@@ -260,10 +271,16 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
 
   const removeTask = async (id: string) => {
     try {
-      // Delete from Firestore
-      await deleteDoc(doc(db, 'task', id));
+      // Delete from Supabase
+      const { error } = await supabase
+        .from('task')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
     } catch (error) {
-      // Continue with local deletion even if Firestore fails
+      console.error('Error deleting task from Supabase:', error);
+      // Continue with local deletion even if Supabase fails
     }
 
     // Update local state
@@ -287,12 +304,11 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resetDailyTasks = () => {
-    const today = new Date().toISOString().split('T')[0];
     const updatedTasks = tasks.map(task => {
       if (task.frequency === 'daily') {
         return {
           ...task,
-          completedToday: false,
+          completed_today: false,
         };
       }
       return task;
@@ -307,13 +323,13 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
         case 'one-time':
           // Show if not completed today
           const dateStr = date.toISOString().split('T')[0];
-          return !task.completionDates?.includes(dateStr);
+          return !task.completion_dates?.includes(dateStr);
         case 'daily':
           // Always show daily tasks
           return true;
         case 'monthly':
           // Show only on matching day of month
-          const taskDay = new Date(task.createdAt).getDate();
+          const taskDay = new Date(task.created_at).getDate();
           return date.getDate() === taskDay;
         default:
           return true;
@@ -345,4 +361,4 @@ export function useTasks() {
     throw new Error('useTasks must be used within a TasksProvider');
   }
   return context;
-} 
+}

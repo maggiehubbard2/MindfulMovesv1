@@ -1,4 +1,4 @@
-import '@/config/firebase'; // Initialize Firebase
+import '@/config/supabase'; // Initialize Supabase
 import { AuthProvider } from '@/context/AuthContext';
 import { HabitsProvider } from '@/context/HabitsContext';
 import { TasksProvider } from '@/context/TasksContext';

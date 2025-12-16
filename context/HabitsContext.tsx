@@ -1,7 +1,6 @@
-import { db } from '@/config/firebase';
+import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 interface Habit {
@@ -36,10 +35,10 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const { user } = useAuth();
 
-  // Load habits from Firestore when user is authenticated
+  // Load habits from Supabase when user is authenticated
   useEffect(() => {
     if (user) {
-      loadHabitsFromFirestore();
+      loadHabitsFromSupabase();
       checkAndResetHabits();
     } else {
       setHabits([]);
@@ -59,50 +58,47 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  const loadHabitsFromFirestore = async () => {
+  const loadHabitsFromSupabase = async () => {
     if (!user) return;
     
     try {
-      const habitsQuery = query(
-        collection(db, 'habit'),
-        where('userId', '==', user.uid)
-      );
+      const { data, error } = await supabase
+        .from('habit')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
       
-      const querySnapshot = await getDocs(habitsQuery);
-      const firestoreHabits: Habit[] = querySnapshot.docs.map(docSnapshot => {
-        const data = docSnapshot.data();
-        const today = new Date().toISOString().split('T')[0];
-        const completionDates = data.completionDates || [];
+      if (error) throw error;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const supabaseHabits: Habit[] = (data || []).map((habit: any) => {
+        const completionDates = habit.completion_dates || [];
         const isCompletedToday = completionDates.includes(today);
         
         return {
-          id: docSnapshot.id,
-          name: data.name,
-          description: data.description,
+          id: habit.id,
+          name: habit.name,
+          description: habit.description,
           completed: isCompletedToday,
-          userId: data.userId,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          completedAt: data.completedAt?.toDate(),
+          userId: habit.user_id,
+          createdAt: new Date(habit.created_at),
+          completedAt: habit.completed_at ? new Date(habit.completed_at) : undefined,
           completionDates: completionDates,
         };
       });
       
-      // Sort by createdAt to maintain consistent order (oldest first)
-      // This will be the default order if no custom order is set
-      const sortedHabits = firestoreHabits.sort((a, b) => 
-        a.createdAt.getTime() - b.createdAt.getTime()
-      );
-      
-      setHabits(sortedHabits);
+      setHabits(supabaseHabits);
     } catch (error) {
-      // Fall back to local storage if Firestore fails
+      console.error('Error loading habits from Supabase:', error);
+      // Fall back to local storage if Supabase fails
       const savedHabits = await AsyncStorage.getItem('habits');
       if (savedHabits) {
         const parsed = JSON.parse(savedHabits);
         // Ensure completionDates exists for backward compatibility
         const habitsWithDates = parsed.map((h: any) => ({
           ...h,
-          completionDates: h.completionDates || [],
+          completionDates: h.completionDates || h.completion_dates || [],
+          createdAt: h.createdAt ? new Date(h.createdAt) : new Date(),
         }));
         setHabits(habitsWithDates);
       }
@@ -127,25 +123,28 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     
     // Update all habits to reset completed status for today
-    const today = new Date().toISOString().split('T')[0];
     const updatedHabits = habits.map(habit => ({
       ...habit,
       completed: false,
       // Keep completionDates array for historical tracking
     }));
 
-    // Update in Firestore
+    // Update in Supabase
     try {
       const updatePromises = updatedHabits.map(habit =>
-        updateDoc(doc(db, 'habit', habit.id), {
-          completed: false,
-        }).catch(() => {
-          // Continue even if individual update fails
-        })
+        supabase
+          .from('habit')
+          .update({ completed: false })
+          .eq('id', habit.id)
+          .then(({ error }) => {
+            if (error) {
+              console.error(`Error resetting habit ${habit.id}:`, error);
+            }
+          })
       );
       await Promise.all(updatePromises);
     } catch (error) {
-      console.error('Error resetting habits in Firestore:', error);
+      console.error('Error resetting habits in Supabase:', error);
     }
 
     setHabits(updatedHabits);
@@ -158,21 +157,32 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     try {
       const habitData = {
         name,
-        description,
+        description: description || null,
         completed: false,
-        userId: user.uid,
-        createdAt: new Date(),
-        completionDates: [],
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+        completion_dates: [],
       };
       
-      // Add to Firestore
-      const docRef = await addDoc(collection(db, 'habit'), habitData);
+      // Add to Supabase
+      const { data, error } = await supabase
+        .from('habit')
+        .insert([habitData])
+        .select()
+        .single();
       
-      // Update local state
+      if (error) throw error;
+      
+      // Update local state (transform to camelCase)
       const newHabit: Habit = {
-        id: docRef.id,
-        ...habitData,
-        completionDates: [],
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        completed: data.completed,
+        userId: data.user_id,
+        createdAt: new Date(data.created_at),
+        completedAt: data.completed_at ? new Date(data.completed_at) : undefined,
+        completionDates: data.completion_dates || [],
       };
       
       setHabits([...habits, newHabit]);
@@ -180,13 +190,14 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       // Also save to local storage as backup
       await AsyncStorage.setItem('habits', JSON.stringify([...habits, newHabit]));
     } catch (error) {
-      // Fallback to local storage if Firestore fails
+      console.error('Error adding habit to Supabase:', error);
+      // Fallback to local storage if Supabase fails
       const newHabit: Habit = {
         id: Date.now().toString(),
         name,
         description,
         completed: false,
-        userId: user.uid,
+        userId: user.id,
         createdAt: new Date(),
         completionDates: [],
       };
@@ -203,19 +214,25 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     const updatedHabit = {
       ...habitToUpdate,
       name,
-      description,
+      description: description || null,
       // Preserve completionDates
       completionDates: habitToUpdate.completionDates || [],
     };
 
-    // Update in Firestore
+    // Update in Supabase
     try {
-      await updateDoc(doc(db, 'habit', id), {
-        name,
-        description: description || null,
-      });
+      const { error } = await supabase
+        .from('habit')
+        .update({
+          name,
+          description: description || null,
+        })
+        .eq('id', id);
+      
+      if (error) throw error;
     } catch (error) {
-      // Firestore update failed, continue with local update
+      console.error('Error updating habit in Supabase:', error);
+      // Supabase update failed, continue with local update
     }
 
     // Update local state
@@ -244,24 +261,30 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       : [...completionDates, dateStr];
 
     const completed = dateStr === today ? !isCompleted : isCompleted;
-    const completedAt = !isCompleted ? new Date() : undefined;
+    const completedAt = !isCompleted ? new Date().toISOString() : undefined;
 
     const updatedHabit = {
       ...habitToUpdate,
       completed: dateStr === today ? completed : habitToUpdate.completed,
-      completedAt,
+      completedAt: completedAt ? new Date(completedAt) : habitToUpdate.completedAt,
       completionDates: newCompletionDates,
     };
 
-    // Update in Firestore
+    // Update in Supabase
     try {
-      await updateDoc(doc(db, 'habit', id), {
-        completed: dateStr === today ? completed : habitToUpdate.completed,
-        completedAt: completedAt || null,
-        completionDates: newCompletionDates,
-      });
+      const { error } = await supabase
+        .from('habit')
+        .update({
+          completed: dateStr === today ? completed : habitToUpdate.completed,
+          completed_at: completedAt || null,
+          completion_dates: newCompletionDates,
+        })
+        .eq('id', id);
+      
+      if (error) throw error;
     } catch (error) {
-      // Firestore update failed, continue with local update
+      console.error('Error updating habit in Supabase:', error);
+      // Supabase update failed, continue with local update
     }
 
     // Update local state
@@ -303,10 +326,16 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
 
   const removeHabit = async (id: string) => {
     try {
-      // Delete from Firestore
-      await deleteDoc(doc(db, 'habit', id));
+      // Delete from Supabase
+      const { error } = await supabase
+        .from('habit')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
     } catch (error) {
-      // Continue with local deletion even if Firestore fails
+      console.error('Error deleting habit from Supabase:', error);
+      // Continue with local deletion even if Supabase fails
     }
 
     // Update local state
@@ -325,8 +354,8 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     setHabits(newHabits);
     await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
     
-    // Note: We don't persist order to Firestore for now since it's a UI preference
-    // If needed, we could add an 'order' field to each habit document
+    // Note: We don't persist order to Supabase for now since it's a UI preference
+    // If needed, we could add an 'order' field to each habit row
   };
 
   return (
@@ -355,4 +384,3 @@ export function useHabits() {
   }
   return context;
 }
-
