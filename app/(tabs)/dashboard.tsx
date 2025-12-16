@@ -7,13 +7,16 @@ import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ConfettiCannon from 'react-native-confetti-cannon';
 
 export default function DashboardScreen() {
   const { colors, isDarkMode } = useTheme();
   const { userProfile } = useAuth();
-  const { setSelectedDate } = useHabits();
+  const { setSelectedDate, getHabitsForDate, selectedDate, habits } = useHabits();
+  const [showConfetti, setShowConfetti] = useState(false);
 
   // Get time-based greeting
   const today = new Date();
@@ -42,6 +45,51 @@ export default function DashboardScreen() {
     router.push('/(tabs)/habits');
   };
 
+  // Check if all habits are completed and trigger confetti
+  const checkAllHabitsCompleted = () => {
+    const habitsForDate = getHabitsForDate(selectedDate);
+    if (habitsForDate.length === 0) {
+      setShowConfetti(false);
+      return; // No habits, no confetti
+    }
+    
+    const allCompleted = habitsForDate.every(habit => habit.completed);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDateNormalized = new Date(selectedDate);
+    selectedDateNormalized.setHours(0, 0, 0, 0);
+    const isToday = selectedDateNormalized.getTime() === today.getTime();
+    
+    // Only trigger confetti for today and if all habits are completed
+    if (allCompleted && isToday) {
+      setShowConfetti(true);
+      // Hide confetti after animation completes
+      setTimeout(() => {
+        setShowConfetti(false);
+      }, 3000);
+    } else {
+      setShowConfetti(false);
+    }
+  };
+
+  // Check when habits change
+  useEffect(() => {
+    checkAllHabitsCompleted();
+  }, [selectedDate, habits]);
+
+  // Reset confetti when date changes
+  useEffect(() => {
+    setShowConfetti(false);
+  }, [selectedDate]);
+
+  // Handle habit toggle callback
+  const handleHabitToggle = () => {
+    // Use setTimeout to check after state updates
+    setTimeout(() => {
+      checkAllHabitsCompleted();
+    }, 100);
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -63,9 +111,13 @@ export default function DashboardScreen() {
               </Text>
             </View>
             {/* Profile Picture Placeholder */}
-            <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary + '20' }]}>
+            <TouchableOpacity
+              style={[styles.avatarPlaceholder, { backgroundColor: colors.primary + '20' }]}
+              onPress={() => router.push('/(tabs)/settings')}
+              activeOpacity={0.7}
+            >
               <Ionicons name="person" size={24} color={colors.primary} />
-            </View>
+            </TouchableOpacity>
           </View>
 
           {/* Weekly Calendar */}
@@ -75,7 +127,7 @@ export default function DashboardScreen() {
           <ReminderCard />
 
           {/* Daily Routine List */}
-          <DailyHabitList maxItems={4} />
+          <DailyHabitList onHabitToggle={handleHabitToggle} />
 
           {/* Floating Action Button */}
           <TouchableOpacity
@@ -87,6 +139,17 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
+      
+      {/* Confetti Animation */}
+      {showConfetti && (
+        <ConfettiCannon
+          count={200}
+          origin={{ x: -10, y: 0 }}
+          fadeOut={true}
+          explosionSpeed={350}
+          fallSpeed={3000}
+        />
+      )}
     </View>
   );
 }

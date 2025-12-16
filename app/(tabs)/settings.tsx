@@ -2,10 +2,11 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useMemo, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const presetPalette = [
@@ -51,6 +52,95 @@ export default function SettingsScreen() {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [tempCustomColor, setTempCustomColor] = useState(customAccentColor);
   const [hexInput, setHexInput] = useState(customAccentColor);
+  const [isReminderEnabled, setIsReminderEnabled] = useState(false);
+
+  // Check if reminder is already set on mount
+  useEffect(() => {
+    checkExistingNotifications();
+  }, []);
+
+  const checkExistingNotifications = async () => {
+    try {
+      const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
+      const hasReminder = scheduledNotifications.some(
+        notification => notification.identifier === 'daily-habit-reminder'
+      );
+      setIsReminderEnabled(hasReminder);
+    } catch (error) {
+      console.error('Error checking notifications:', error);
+    }
+  };
+
+  const handleToggleReminder = async (value: boolean) => {
+    try {
+      if (value) {
+        // Enable reminder
+        const { status } = await Notifications.requestPermissionsAsync();
+        
+        if (status !== 'granted') {
+          Alert.alert(
+            'Permission Denied',
+            'Notifications permission is required to set reminders. Please enable it in your device settings.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+
+        if (Platform.OS === 'android') {
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'default',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#FF231F7C',
+          });
+        }
+
+        // Cancel existing reminder if any
+        await Notifications.cancelScheduledNotificationAsync('daily-habit-reminder');
+
+        // Schedule daily reminder at 8:00 AM
+        const trigger: Notifications.DailyTriggerInput = {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: 8,
+          minute: 0,
+        };
+
+        await Notifications.scheduleNotificationAsync({
+          identifier: 'daily-habit-reminder',
+          content: {
+            title: 'Time for your habits! 🌟',
+            body: 'Don\'t forget to complete your daily habits!',
+            sound: true,
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+          },
+          trigger,
+        });
+
+        setIsReminderEnabled(true);
+        Alert.alert(
+          'Reminder Enabled',
+          'You\'ll receive a daily reminder at 8:00 AM to lock in.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        // Disable reminder
+        await Notifications.cancelScheduledNotificationAsync('daily-habit-reminder');
+        setIsReminderEnabled(false);
+        Alert.alert(
+          'Reminder Disabled',
+          'Your daily reminder has been cancelled.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Error toggling reminder:', error);
+      Alert.alert(
+        'Error',
+        'Failed to update reminder. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
 
   const confirmLogout = async () => {
     try {
@@ -189,6 +279,25 @@ export default function SettingsScreen() {
                 );
               })}
             </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Notifications</Text>
+          
+          <View style={[styles.settingItem, { backgroundColor: colors.card }]}>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingTitle, { color: colors.text }]}>Daily Reminders</Text>
+              <Text style={[styles.settingDescription, { color: colors.secondary }]}>
+                Receive a daily reminder at 8:00 AM to complete your habits
+              </Text>
+            </View>
+            <Switch
+              value={isReminderEnabled}
+              onValueChange={handleToggleReminder}
+              trackColor={{ false: '#767577', true: colors.primary }}
+              thumbColor={isReminderEnabled ? '#f4f3f4' : '#f4f3f4'}
+            />
           </View>
         </View>
 

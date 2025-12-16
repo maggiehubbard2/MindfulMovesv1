@@ -130,7 +130,9 @@ export default function LoginScreen() {
         errorMessage = 'Invalid email address';
       } else if (error?.message?.includes('Password')) {
         errorMessage = error.message;
-      } else if (error?.message?.includes('Invalid login credentials') || error?.message?.includes('Email not confirmed')) {
+      } else if (error?.message?.includes('Email not confirmed') || error?.message?.includes('email_not_confirmed') || error?.code === 'email_not_confirmed') {
+        errorMessage = 'Please check your email and click the confirmation link before signing in.';
+      } else if (error?.message?.includes('Invalid login credentials') || error?.code === 'invalid_credentials') {
         errorMessage = 'Incorrect email or password. Please check your credentials and try again.';
       } else if (error?.message) {
         errorMessage = error.message;

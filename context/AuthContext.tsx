@@ -88,7 +88,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
       });
       
-      if (error) throw error;
+      if (error) {
+        // Provide more helpful error messages
+        if (error.message?.includes('Email not confirmed') || error.message?.includes('email_not_confirmed')) {
+          throw new Error('Please check your email and click the confirmation link before signing in.');
+        }
+        throw error;
+      }
       
       if (data.user) {
         await fetchUserProfile(data.user.id);
@@ -109,10 +115,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Please enter a valid email address');
       }
       
-      // Sign up user
+      // Sign up user with metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            name: firstName,
+            first_name: firstName,
+          },
+        },
       });
       
       if (authError) throw authError;
@@ -121,33 +133,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Failed to create user');
       }
       
-      // Create user profile in database
-      const userData = {
-        id: authData.user.id,
-        email: email,
-        name: firstName,
-        first_name: firstName,
-        created_at: new Date().toISOString(),
-      };
-      
-      const { error: dbError } = await supabase
-        .from('users')
-        .insert([userData]);
-      
-      if (dbError) {
-        // If profile creation fails, we still have the auth user
-        // but we should log the error
-        console.error('Error creating user profile:', dbError);
+      // Create user profile using a database function (bypasses RLS)
+      // This is a fallback in case the trigger doesn't fire
+      try {
+        const { error: profileError } = await supabase.rpc('create_user_profile', {
+          user_id: authData.user.id,
+          user_email: email,
+          user_name: firstName,
+          user_first_name: firstName,
+        });
+        
+        if (profileError) {
+          console.error('Error creating profile via RPC:', profileError);
+          // Continue anyway - trigger might have created it
+        }
+      } catch (rpcError) {
+        console.error('RPC call failed:', rpcError);
+        // Continue anyway - trigger might have created it
       }
       
-      // Update local state
-      setUserProfile({
-        id: userData.id,
-        email: userData.email,
-        name: userData.name,
-        firstName: userData.first_name,
-        created_at: userData.created_at,
-      });
+      // Wait a moment for profile creation to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Fetch the profile
+      if (authData.user && authData.session) {
+        // User is immediately logged in (email confirmation disabled)
+        await fetchUserProfile(authData.user.id);
+      } else if (authData.user) {
+        // Email confirmation required - set profile from metadata temporarily
+        setUserProfile({
+          id: authData.user.id,
+          email: authData.user.email || email,
+          name: firstName,
+          firstName: firstName,
+          created_at: new Date().toISOString(),
+        });
+      }
     } catch (error: any) {
       throw error;
     }

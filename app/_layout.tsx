@@ -1,7 +1,6 @@
 import '@/config/supabase'; // Initialize Supabase
 import { AuthProvider } from '@/context/AuthContext';
 import { HabitsProvider } from '@/context/HabitsContext';
-import { TasksProvider } from '@/context/TasksContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { Stack } from 'expo-router';
 
@@ -40,11 +39,9 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <TasksProvider>
-          <HabitsProvider>
-            <RootLayoutNav />
-          </HabitsProvider>
-        </TasksProvider>
+        <HabitsProvider>
+          <RootLayoutNav />
+        </HabitsProvider>
       </AuthProvider>
     </ThemeProvider>
   );
