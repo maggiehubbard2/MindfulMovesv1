@@ -10,6 +10,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -89,10 +91,10 @@ export default function ReminderCard({ onSetReminder }: ReminderCardProps) {
       await Notifications.cancelScheduledNotificationAsync('daily-habit-reminder');
 
       // Schedule daily reminder at 8:00 AM
-      const trigger = {
+      const trigger: Notifications.DailyTriggerInput = {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: 8,
         minute: 0,
-        repeats: true,
       };
 
       await Notifications.scheduleNotificationAsync({
@@ -136,6 +138,11 @@ export default function ReminderCard({ onSetReminder }: ReminderCardProps) {
       console.error('Error cancelling reminder:', error);
     }
   };
+
+  // Hide the card if reminder is already active
+  if (isReminderSet) {
+    return null;
+  }
 
   return (
     <View style={[

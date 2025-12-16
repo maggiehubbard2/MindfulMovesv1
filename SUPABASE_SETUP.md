@@ -90,38 +90,8 @@ CREATE POLICY "Users can delete own habits" ON habit
   FOR DELETE USING (auth.uid() = user_id);
 ```
 
-### Tasks Table (Optional - if you're using tasks)
-```sql
-CREATE TABLE task (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  streak INTEGER DEFAULT 0,
-  completed_today BOOLEAN DEFAULT FALSE,
-  emoji TEXT,
-  last_completed_date TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  habit_id UUID REFERENCES habit(id) ON DELETE SET NULL,
-  frequency TEXT DEFAULT 'one-time',
-  completion_dates TEXT[] DEFAULT '{}'
-);
-
--- Enable Row Level Security
-ALTER TABLE task ENABLE ROW LEVEL SECURITY;
-
--- Policy: Users can only access their own tasks
-CREATE POLICY "Users can view own tasks" ON task
-  FOR SELECT USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own tasks" ON task
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own tasks" ON task
-  FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own tasks" ON task
-  FOR DELETE USING (auth.uid() = user_id);
-```
+### Tasks Table
+**Note:** Tasks are not part of the MVP. The app focuses on habits only. If you want to add tasks in the future, you can create this table later.
 
 ## 5. Configure Authentication
 

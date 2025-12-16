@@ -3,12 +3,12 @@ import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withSequence,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -35,8 +35,8 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
     return a.completed ? 1 : -1;
   });
 
-  const displayedHabits = maxItems ? sortedHabits.slice(0, maxItems) : sortedHabits;
-  const hasMore = maxItems && sortedHabits.length > maxItems;
+  const displayedHabits = sortedHabits;
+  const hasMore = false; // Always show all habits, no "see all" needed
 
   const iconColors = [
     '#FFA07A', // Light salmon
@@ -96,10 +96,7 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
       </View>
 
       {/* Habit List */}
-      <ScrollView 
-        style={styles.list}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.list}>
         {displayedHabits.map((habit, index) => {
           const isCompleted = habit.completed;
           const icon = getHabitIcon(habit.name, index);
@@ -118,7 +115,7 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
             />
           );
         })}
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -188,22 +185,28 @@ function AnimatedHabitRow({ habit, index, isLast, icon, colors, isEditable, onTo
             }
           ]} />
         )}
-        <Animated.View
-          style={[
-            styles.completionIndicator,
-            { 
-              backgroundColor: isCompleted ? colors.primary : 'transparent',
-              borderColor: isCompleted ? colors.primary : colors.border
-            },
-            animatedIndicatorStyle,
-          ]}
+        <TouchableOpacity
+          onPress={onToggle}
+          disabled={!isEditable}
+          activeOpacity={0.7}
         >
-          {isCompleted && (
-            <Animated.View style={animatedCheckmarkStyle}>
-              <Ionicons name="checkmark" size={12} color="white" />
-            </Animated.View>
-          )}
-        </Animated.View>
+          <Animated.View
+            style={[
+              styles.completionIndicator,
+              { 
+                backgroundColor: isCompleted ? colors.primary : 'transparent',
+                borderColor: isCompleted ? colors.primary : colors.border
+              },
+              animatedIndicatorStyle,
+            ]}
+          >
+            {isCompleted && (
+              <Animated.View style={animatedCheckmarkStyle}>
+                <Ionicons name="checkmark" size={12} color="white" />
+              </Animated.View>
+            )}
+          </Animated.View>
+        </TouchableOpacity>
       </View>
 
       {/* Habit Card */}
