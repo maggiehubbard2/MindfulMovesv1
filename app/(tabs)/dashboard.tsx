@@ -1,5 +1,6 @@
 import DailyHabitList from '@/components/DailyHabitList';
 import ReminderCard from '@/components/ReminderCard';
+import ShareWinScreen from '@/components/ShareWinScreen';
 import WeeklyCalendar from '@/components/WeeklyCalendar';
 import { useAuth } from '@/context/AuthContext';
 import { useHabits } from '@/context/HabitsContext';
@@ -7,7 +8,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ConfettiCannon from 'react-native-confetti-cannon';
@@ -17,6 +18,10 @@ export default function DashboardScreen() {
   const { userProfile } = useAuth();
   const { setSelectedDate, getHabitsForDate, selectedDate, habits } = useHabits();
   const [showConfetti, setShowConfetti] = useState(false);
+  const [showShareWin, setShowShareWin] = useState(false);
+  const confettiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const shareWinTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const wasAllCompletedRef = useRef(false);
 
   // Get time-based greeting
   const today = new Date();
@@ -50,6 +55,8 @@ export default function DashboardScreen() {
     const habitsForDate = getHabitsForDate(selectedDate);
     if (habitsForDate.length === 0) {
       setShowConfetti(false);
+      setShowShareWin(false);
+      wasAllCompletedRef.current = false;
       return; // No habits, no confetti
     }
     
@@ -60,26 +67,54 @@ export default function DashboardScreen() {
     selectedDateNormalized.setHours(0, 0, 0, 0);
     const isToday = selectedDateNormalized.getTime() === today.getTime();
     
-    // Only trigger confetti for today and if all habits are completed
-    if (allCompleted && isToday) {
+    // Only trigger if transitioning from not all completed to all completed
+    if (allCompleted && isToday && !wasAllCompletedRef.current) {
+      // Clear any existing timeouts
+      if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
+      if (shareWinTimeoutRef.current) clearTimeout(shareWinTimeoutRef.current);
+      
       setShowConfetti(true);
-      // Hide confetti after animation completes
-      setTimeout(() => {
+      wasAllCompletedRef.current = true;
+      
+      // Hide confetti after animation completes, then show share screen
+      confettiTimeoutRef.current = setTimeout(() => {
         setShowConfetti(false);
-      }, 3000);
-    } else {
+        // Double-check if all habits are still completed before showing share screen
+        const currentHabits = getHabitsForDate(selectedDate);
+        const stillAllCompleted = currentHabits.every(habit => habit.completed);
+        if (stillAllCompleted) {
+          shareWinTimeoutRef.current = setTimeout(() => {
+            setShowShareWin(true);
+          }, 500); // Small delay after confetti fades
+        }
+      }, 3000); // Confetti duration
+    } else if (!allCompleted || !isToday) {
       setShowConfetti(false);
+      setShowShareWin(false);
+      wasAllCompletedRef.current = false;
+      // Clear any pending timeouts if habits are unchecked or date changes
+      if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
+      if (shareWinTimeoutRef.current) clearTimeout(shareWinTimeoutRef.current);
     }
   };
 
   // Check when habits change
   useEffect(() => {
     checkAllHabitsCompleted();
+    return () => {
+      // Cleanup on unmount or dependency change
+      if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
+      if (shareWinTimeoutRef.current) clearTimeout(shareWinTimeoutRef.current);
+    };
   }, [selectedDate, habits]);
 
-  // Reset confetti when date changes
+  // Reset confetti and share screen when date changes
   useEffect(() => {
     setShowConfetti(false);
+    setShowShareWin(false);
+    wasAllCompletedRef.current = false;
+    if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
+    if (shareWinTimeoutRef.current) clearTimeout(shareWinTimeoutRef.current);
   }, [selectedDate]);
 
   // Handle habit toggle callback
@@ -150,6 +185,9 @@ export default function DashboardScreen() {
           fallSpeed={3000}
         />
       )}
+
+      {/* Share Win Screen */}
+      <ShareWinScreen visible={showShareWin} onClose={() => setShowShareWin(false)} />
     </View>
   );
 }
