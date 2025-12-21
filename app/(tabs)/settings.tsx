@@ -1,10 +1,13 @@
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { supabase } from '@/config/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -53,11 +56,136 @@ export default function SettingsScreen() {
   const [tempCustomColor, setTempCustomColor] = useState(customAccentColor);
   const [hexInput, setHexInput] = useState(customAccentColor);
   const [isReminderEnabled, setIsReminderEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState<Date>(new Date());
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [isLoadingReminderTime, setIsLoadingReminderTime] = useState(true);
+  const [pendingTimeUpdate, setPendingTimeUpdate] = useState<Date | null>(null);
+
+  // Load reminder time from database (with local cache fallback)
+  useEffect(() => {
+    loadReminderTime();
+  }, [user]);
 
   // Check if reminder is already set on mount
   useEffect(() => {
     checkExistingNotifications();
   }, []);
+
+  const loadReminderTime = async () => {
+    if (!user) {
+      setIsLoadingReminderTime(false);
+      return;
+    }
+
+    try {
+      // Try to load from local cache first for faster load
+      const cachedTime = await AsyncStorage.getItem('reminderTime');
+      if (cachedTime) {
+        const [hours, minutes] = cachedTime.split(':').map(Number);
+        const time = new Date();
+        time.setHours(hours, minutes, 0, 0);
+        setReminderTime(time);
+        setIsLoadingReminderTime(false);
+      }
+
+      // Then fetch from database
+      const { data, error } = await supabase
+        .from('users')
+        .select('reminder_time')
+        .eq('id', user.id)
+        .single();
+
+      // Handle case where column doesn't exist yet (error codes 42703 or PGRST204)
+      if (error) {
+        // If column doesn't exist, use default time and don't log as error
+        if (error.code === '42703' || error.code === 'PGRST204') {
+          // Column doesn't exist - user needs to run migration
+          // Use default time for now
+          const defaultTime = new Date();
+          defaultTime.setHours(8, 0, 0, 0);
+          setReminderTime(defaultTime);
+          setIsLoadingReminderTime(false);
+          return;
+        }
+        throw error;
+      }
+
+      if (data?.reminder_time) {
+        const [hours, minutes] = data.reminder_time.split(':').map(Number);
+        const time = new Date();
+        time.setHours(hours, minutes, 0, 0);
+        setReminderTime(time);
+        // Cache it locally
+        await AsyncStorage.setItem('reminderTime', data.reminder_time);
+      } else {
+        // Default to 8:00 AM if no time is set
+        const defaultTime = new Date();
+        defaultTime.setHours(8, 0, 0, 0);
+        setReminderTime(defaultTime);
+      }
+    } catch (error: any) {
+      // Only log non-column-missing errors
+      if (error?.code !== '42703' && error?.code !== 'PGRST204') {
+        console.error('Error loading reminder time:', error);
+      }
+      // Fall back to default time
+      const defaultTime = new Date();
+      defaultTime.setHours(8, 0, 0, 0);
+      setReminderTime(defaultTime);
+    } finally {
+      setIsLoadingReminderTime(false);
+    }
+  };
+
+  const saveReminderTime = async (time: Date) => {
+    if (!user) return;
+
+    const hours = time.getHours();
+    const minutes = time.getMinutes();
+    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+    try {
+      // Save to database
+      const { error } = await supabase
+        .from('users')
+        .update({ reminder_time: timeString })
+        .eq('id', user.id);
+
+      // Handle case where column doesn't exist yet
+      if (error) {
+        if (error.code === '42703' || error.code === 'PGRST204') {
+          Alert.alert(
+            'Database Migration Required',
+            'Please run the SQL migration to add the reminder_time column. Check supabase_reminder_time.sql file.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        throw error;
+      }
+
+      // Cache locally
+      await AsyncStorage.setItem('reminderTime', timeString);
+    } catch (error: any) {
+      if (error?.code !== '42703' && error?.code !== 'PGRST204') {
+        console.error('Error saving reminder time:', error);
+        Alert.alert(
+          'Error',
+          'Failed to save reminder time. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
+    }
+  };
+
+  const formatTime = (date: Date): string => {
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    const displayMinutes = minutes.toString().padStart(2, '0');
+    return `${displayHours}:${displayMinutes} ${ampm}`;
+  };
 
   const checkExistingNotifications = async () => {
     try {
@@ -68,6 +196,54 @@ export default function SettingsScreen() {
       setIsReminderEnabled(hasReminder);
     } catch (error) {
       console.error('Error checking notifications:', error);
+    }
+  };
+
+  // Reschedule reminder with new time (without showing disabled alert)
+  const rescheduleReminder = async (newTime: Date) => {
+    try {
+      // Cancel existing reminder
+      await Notifications.cancelScheduledNotificationAsync('daily-habit-reminder');
+
+      // Use the new reminder time
+      const hours = newTime.getHours();
+      const minutes = newTime.getMinutes();
+
+      // Schedule daily reminder at the new time
+      const trigger: Notifications.DailyTriggerInput = {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour: hours,
+        minute: minutes,
+      };
+
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'daily-habit-reminder',
+        content: {
+          title: 'Time for your habits! 🌟',
+          body: 'Don\'t forget to complete your daily habits!',
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger,
+      });
+
+      // Update state
+      setIsReminderEnabled(true);
+      
+      // Show success message with updated time
+      const timeString = formatTime(newTime);
+      Alert.alert(
+        'Reminder Time Updated',
+        `Your daily reminder has been updated to ${timeString}.`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Error rescheduling reminder:', error);
+      Alert.alert(
+        'Error',
+        'Failed to update reminder time. Please try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -98,11 +274,15 @@ export default function SettingsScreen() {
         // Cancel existing reminder if any
         await Notifications.cancelScheduledNotificationAsync('daily-habit-reminder');
 
-        // Schedule daily reminder at 8:00 AM
+        // Use the saved reminder time
+        const hours = reminderTime.getHours();
+        const minutes = reminderTime.getMinutes();
+
+        // Schedule daily reminder at the selected time
         const trigger: Notifications.DailyTriggerInput = {
           type: Notifications.SchedulableTriggerInputTypes.DAILY,
-          hour: 8,
-          minute: 0,
+          hour: hours,
+          minute: minutes,
         };
 
         await Notifications.scheduleNotificationAsync({
@@ -117,13 +297,14 @@ export default function SettingsScreen() {
         });
 
         setIsReminderEnabled(true);
+        const timeString = formatTime(reminderTime);
         Alert.alert(
           'Reminder Enabled',
-          'You\'ll receive a daily reminder at 8:00 AM to lock in.',
+          `Your daily reminder has been set for ${timeString}.`,
           [{ text: 'OK' }]
         );
       } else {
-        // Disable reminder
+        // Disable reminder (only show alert when user actually toggles off)
         await Notifications.cancelScheduledNotificationAsync('daily-habit-reminder');
         setIsReminderEnabled(false);
         Alert.alert(
@@ -139,6 +320,41 @@ export default function SettingsScreen() {
         'Failed to update reminder. Please try again.',
         [{ text: 'OK' }]
       );
+    }
+  };
+
+  const handleTimeChange = (event: any, selectedTime?: Date) => {
+    if (selectedTime) {
+      setReminderTime(selectedTime);
+      saveReminderTime(selectedTime);
+      
+      // Store the pending update - we'll reschedule after picker closes
+      if (isReminderEnabled) {
+        setPendingTimeUpdate(selectedTime);
+      }
+    }
+
+    // For Android, picker closes automatically, so we delay the reschedule
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+      // Delay to ensure picker is closed before showing alert
+      setTimeout(() => {
+        if (selectedTime && isReminderEnabled) {
+          rescheduleReminder(selectedTime);
+          setPendingTimeUpdate(null);
+        }
+      }, 300);
+    }
+  };
+
+  const handleCloseTimePicker = () => {
+    setShowTimePicker(false);
+    // For iOS, reschedule after modal closes
+    if (pendingTimeUpdate && isReminderEnabled) {
+      setTimeout(() => {
+        rescheduleReminder(pendingTimeUpdate);
+        setPendingTimeUpdate(null);
+      }, 300);
     }
   };
 
@@ -289,7 +505,9 @@ export default function SettingsScreen() {
             <View style={styles.settingInfo}>
               <Text style={[styles.settingTitle, { color: colors.text }]}>Daily Reminders</Text>
               <Text style={[styles.settingDescription, { color: colors.secondary }]}>
-                Receive a daily reminder at 8:00 AM to complete your habits
+                {isReminderEnabled 
+                  ? `Receive a daily reminder at ${formatTime(reminderTime)} to complete your habits`
+                  : 'Get daily reminders to complete your habits'}
               </Text>
             </View>
             <Switch
@@ -299,6 +517,72 @@ export default function SettingsScreen() {
               thumbColor={isReminderEnabled ? '#f4f3f4' : '#f4f3f4'}
             />
           </View>
+
+          {/* Reminder Time Picker */}
+          {isReminderEnabled && (
+            <TouchableOpacity
+              style={[styles.settingItem, { backgroundColor: colors.card }]}
+              onPress={() => setShowTimePicker(true)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.settingInfo}>
+                <View style={styles.timePickerRow}>
+                  <Ionicons name="time-outline" size={20} color={colors.text} />
+                  <Text style={[styles.settingText, { color: colors.text, marginLeft: 8 }]}>
+                    Reminder Time
+                  </Text>
+                </View>
+                {!isLoadingReminderTime && (
+                  <Text style={[styles.timeDisplay, { color: colors.primary }]}>
+                    {formatTime(reminderTime)}
+                  </Text>
+                )}
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.secondary} />
+            </TouchableOpacity>
+          )}
+
+          {/* Time Picker Modal (iOS) or Inline (Android) */}
+          {showTimePicker && (
+            Platform.OS === 'ios' ? (
+              <Modal
+                visible={showTimePicker}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={handleCloseTimePicker}
+              >
+                <View style={styles.modalOverlay}>
+                  <View style={[styles.timePickerModal, { backgroundColor: colors.card }]}>
+                    <View style={styles.timePickerHeader}>
+                      <Text style={[styles.modalTitle, { color: colors.text }]}>Select Time</Text>
+                      <TouchableOpacity
+                        onPress={handleCloseTimePicker}
+                        style={styles.closeButton}
+                      >
+                        <Text style={[styles.closeButtonText, { color: colors.primary }]}>Done</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <DateTimePicker
+                      value={reminderTime}
+                      mode="time"
+                      is24Hour={false}
+                      display="spinner"
+                      onChange={handleTimeChange}
+                      textColor={colors.text}
+                    />
+                  </View>
+                </View>
+              </Modal>
+            ) : (
+              <DateTimePicker
+                value={reminderTime}
+                mode="time"
+                is24Hour={false}
+                display="default"
+                onChange={handleTimeChange}
+              />
+            )
+          )}
         </View>
 
         <View style={styles.section}>
@@ -697,6 +981,40 @@ const styles = StyleSheet.create({
   },
   modalButtonText: {
     color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  timePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  timeDisplay: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  timePickerModal: {
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  timePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  closeButton: {
+    padding: 8,
+  },
+  closeButtonText: {
     fontSize: 16,
     fontWeight: '600',
   },

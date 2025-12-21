@@ -1,7 +1,11 @@
+import { supabase } from '@/config/supabase';
+import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // Configure notification handler
@@ -21,16 +25,75 @@ interface ReminderCardProps {
 
 export default function ReminderCard({ onSetReminder }: ReminderCardProps) {
   const { colors } = useTheme();
+  const { user } = useAuth();
   const [isReminderSet, setIsReminderSet] = useState(false);
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
+  const [reminderTime, setReminderTime] = useState<{ hour: number; minute: number }>({ hour: 8, minute: 0 });
 
   useEffect(() => {
-    // Check if notification is already scheduled
-    checkExistingNotifications();
-    
     // Register for push notifications
     registerForPushNotificationsAsync().then(token => setExpoPushToken(token));
-  }, []);
+    
+    // Load reminder time from database
+    loadReminderTime();
+  }, [user]);
+
+  // Re-check notification status when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      checkExistingNotifications();
+    }, [])
+  );
+
+  const loadReminderTime = async () => {
+    if (!user) return;
+
+    try {
+      // Try cache first
+      const cachedTime = await AsyncStorage.getItem('reminderTime');
+      if (cachedTime) {
+        const [hours, minutes] = cachedTime.split(':').map(Number);
+        setReminderTime({ hour: hours, minute: minutes });
+      }
+
+      // Fetch from database
+      const { data, error } = await supabase
+        .from('users')
+        .select('reminder_time')
+        .eq('id', user.id)
+        .single();
+
+      // Handle case where column doesn't exist yet (error codes 42703 or PGRST204)
+      if (error) {
+        // If column doesn't exist, use default time and don't log as error
+        if (error.code === '42703' || error.code === 'PGRST204') {
+          // Column doesn't exist - user needs to run migration
+          // Keep default 8:00 AM
+          return;
+        }
+        throw error;
+      }
+
+      if (data?.reminder_time) {
+        const [hours, minutes] = data.reminder_time.split(':').map(Number);
+        setReminderTime({ hour: hours, minute: minutes });
+        await AsyncStorage.setItem('reminderTime', data.reminder_time);
+      }
+    } catch (error: any) {
+      // Only log non-column-missing errors
+      if (error?.code !== '42703' && error?.code !== 'PGRST204') {
+        console.error('Error loading reminder time:', error);
+      }
+      // Keep default 8:00 AM
+    }
+  };
+
+  const formatTime = (hour: number, minute: number): string => {
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHours = hour % 12 || 12;
+    const displayMinutes = minute.toString().padStart(2, '0');
+    return `${displayHours}:${displayMinutes} ${ampm}`;
+  };
 
   const checkExistingNotifications = async () => {
     const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
@@ -90,11 +153,11 @@ export default function ReminderCard({ onSetReminder }: ReminderCardProps) {
       // Cancel existing reminder if any
       await Notifications.cancelScheduledNotificationAsync('daily-habit-reminder');
 
-      // Schedule daily reminder at 8:00 AM
+      // Schedule daily reminder at the saved time (or default 8:00 AM)
       const trigger: Notifications.DailyTriggerInput = {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: 8,
-        minute: 0,
+        hour: reminderTime.hour,
+        minute: reminderTime.minute,
       };
 
       await Notifications.scheduleNotificationAsync({
@@ -109,9 +172,10 @@ export default function ReminderCard({ onSetReminder }: ReminderCardProps) {
       });
 
       setIsReminderSet(true);
+      const timeString = formatTime(reminderTime.hour, reminderTime.minute);
       Alert.alert(
         'Reminder Set!',
-        'You\'ll receive a daily reminder at 8:00 AM to complete your habits.',
+        `You'll receive a daily reminder at ${timeString} to complete your habits. You can change this time in Settings.`,
         [{ text: 'OK' }]
       );
       onSetReminder?.();
@@ -158,7 +222,7 @@ export default function ReminderCard({ onSetReminder }: ReminderCardProps) {
           </Text>
           <Text style={[styles.description, { color: colors.secondary }]}>
             {isReminderSet 
-              ? 'You\'ll receive a daily reminder at 8:00 AM to complete your habits.'
+              ? `You'll receive a daily reminder at ${formatTime(reminderTime.hour, reminderTime.minute)} to complete your habits.`
               : 'Never miss your morning routine! Set a reminder to stay on track'}
           </Text>
         </View>

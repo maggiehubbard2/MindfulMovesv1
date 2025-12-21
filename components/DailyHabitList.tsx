@@ -72,6 +72,43 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
     onHabitToggle?.(id);
   };
 
+  // Calculate streak for a habit based on consecutive completion days
+  const calculateStreak = (completionDates: string[]): number => {
+    if (!completionDates || completionDates.length === 0) return 0;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+    
+    // Check if today is completed
+    const hasToday = completionDates.includes(todayStr);
+    
+    // Start counting from today if completed, otherwise from yesterday
+    let currentDate = new Date(today);
+    if (!hasToday) {
+      currentDate.setDate(currentDate.getDate() - 1);
+    }
+    
+    let streak = 0;
+    
+    // Count consecutive days going backwards
+    // Limit to 365 days to prevent infinite loops
+    for (let i = 0; i < 365; i++) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      const isCompleted = completionDates.includes(dateStr);
+      
+      if (isCompleted) {
+        streak++;
+        currentDate.setDate(currentDate.getDate() - 1);
+      } else {
+        // Stop at first gap
+        break;
+      }
+    }
+    
+    return streak;
+  };
+
   if (habits.length === 0) {
     return (
       <View style={styles.emptyContainer}>
@@ -102,6 +139,8 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
           const icon = getHabitIcon(habit.name, index);
           const isLast = index === displayedHabits.length - 1;
 
+          const streak = calculateStreak(habit.completionDates || []);
+
           return (
             <AnimatedHabitRow
               key={habit.id}
@@ -111,6 +150,7 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
               icon={icon}
               colors={colors}
               isEditable={isEditable}
+              streak={streak}
               onToggle={() => handleToggle(habit.id)}
             />
           );
@@ -127,10 +167,11 @@ interface AnimatedHabitRowProps {
   icon: { name: string; color: string };
   colors: any;
   isEditable: boolean;
+  streak: number;
   onToggle: () => void;
 }
 
-function AnimatedHabitRow({ habit, index, isLast, icon, colors, isEditable, onToggle }: AnimatedHabitRowProps) {
+function AnimatedHabitRow({ habit, index, isLast, icon, colors, isEditable, streak, onToggle }: AnimatedHabitRowProps) {
   const isCompleted = habit.completed;
   const indicatorScale = useSharedValue(1);
   const checkmarkScale = useSharedValue(0);
@@ -231,20 +272,31 @@ function AnimatedHabitRow({ habit, index, isLast, icon, colors, isEditable, onTo
 
           {/* Habit Info */}
           <View style={styles.habitInfo}>
-            <Text 
-              style={[
-                styles.habitName,
-                { 
-                  color: colors.text,
-                  textDecorationLine: isCompleted ? 'line-through' : 'none',
-                  opacity: isCompleted ? 0.6 : 1
-                }
-              ]}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {habit.name}
-            </Text>
+            <View style={styles.habitNameRow}>
+              <Text 
+                style={[
+                  styles.habitName,
+                  { 
+                    color: colors.text,
+                    textDecorationLine: isCompleted ? 'line-through' : 'none',
+                    opacity: isCompleted ? 0.6 : 1,
+                  }
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {habit.name}
+              </Text>
+              {/* Streak Indicator */}
+              {streak > 1 && (
+                <View style={styles.streakIndicator} pointerEvents="none">
+                  <Text style={styles.streakEmoji}>🔥</Text>
+                  <Text style={[styles.streakText, { color: colors.secondary }]}>
+                    {streak} {streak === 1 ? 'Day' : 'Days'}
+                  </Text>
+                </View>
+              )}
+            </View>
             {habit.description && (
               <Text style={[styles.habitDescription, { color: colors.secondary }]} numberOfLines={1}>
                 {habit.description}
@@ -345,10 +397,31 @@ const styles = StyleSheet.create({
     marginRight: 8,
     minWidth: 0, // Important for flex children to shrink properly
   },
+  habitNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  streakIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+    flexShrink: 0,
+  },
+  streakEmoji: {
+    fontSize: 12,
+    marginRight: 2,
+  },
+  streakText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
   habitName: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
+    flex: 1,
+    minWidth: 0,
   },
   habitDescription: {
     fontSize: 12,

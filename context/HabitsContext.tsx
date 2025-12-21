@@ -78,7 +78,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         return {
           id: habit.id,
           name: habit.name,
-          description: habit.description,
+          description: habit.description || undefined,
           completed: isCompletedToday,
           userId: habit.user_id,
           createdAt: new Date(habit.created_at),
@@ -211,10 +211,10 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     const habitToUpdate = habits.find(habit => habit.id === id);
     if (!habitToUpdate) return;
 
-    const updatedHabit = {
+    const updatedHabit: Habit = {
       ...habitToUpdate,
       name,
-      description: description || null,
+      description: description || undefined,
       // Preserve completionDates
       completionDates: habitToUpdate.completionDates || [],
     };
@@ -225,7 +225,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         .from('habit')
         .update({
           name,
-          description: description || null,
+          description: description || null, // Supabase uses null, but we convert to undefined in our types
         })
         .eq('id', id);
       
@@ -260,13 +260,16 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       ? completionDates.filter(d => d !== dateStr)
       : [...completionDates, dateStr];
 
-    const completed = dateStr === today ? !isCompleted : isCompleted;
-    const completedAt = !isCompleted ? new Date().toISOString() : undefined;
+    // Update completed status based on whether the date is in the new completion dates
+    const newIsCompleted = newCompletionDates.includes(dateStr);
+    const completed = dateStr === today ? newIsCompleted : habitToUpdate.completed;
+    const completedAt = newIsCompleted ? new Date().toISOString() : (dateStr === today ? undefined : habitToUpdate.completedAt);
 
-    const updatedHabit = {
+    const updatedHabit: Habit = {
       ...habitToUpdate,
-      completed: dateStr === today ? completed : habitToUpdate.completed,
-      completedAt: completedAt ? new Date(completedAt) : habitToUpdate.completedAt,
+      description: habitToUpdate.description || undefined,
+      completed,
+      completedAt: completedAt ? new Date(completedAt) : undefined,
       completionDates: newCompletionDates,
     };
 
