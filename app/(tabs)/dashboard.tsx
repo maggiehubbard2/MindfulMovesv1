@@ -9,8 +9,8 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import ConfettiCannon from 'react-native-confetti-cannon';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function DashboardScreen() {
   const { colors, isDarkMode } = useTheme();
@@ -42,7 +42,7 @@ export default function DashboardScreen() {
   const handleDatePress = (date: Date) => {
     // Navigate to habits screen with the selected date
     setSelectedDate(date);
-    router.push('/(tabs)/habits');
+   // router.push('/(tabs)/habits');
   };
 
   // Check if all habits are completed and trigger confetti

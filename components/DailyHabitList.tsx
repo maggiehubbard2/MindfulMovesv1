@@ -120,11 +120,17 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
     );
   }
 
+const weekday =
+  selectedDate
+    ? selectedDate.toLocaleDateString('en-US', { weekday: 'long' })
+    : 'Daily';
+
+
   return (
     <View style={styles.container}>
       {/* Section Header */}
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Daily habits</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{weekday} Habits</Text>
         {hasMore && (
           <TouchableOpacity onPress={() => router.push('/(tabs)/habits')}>
             <Text style={[styles.seeAllText, { color: colors.primary }]}>See all</Text>
