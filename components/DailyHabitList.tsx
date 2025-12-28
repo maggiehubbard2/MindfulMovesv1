@@ -221,40 +221,30 @@ function AnimatedHabitRow({ habit, index, isLast, icon, colors, isEditable, stre
 
   return (
     <View style={styles.habitRow}>
-      {/* Completion Indicator Line */}
-      <View style={styles.indicatorColumn}>
-        {!isLast && (
-          <View style={[
-            styles.indicatorLine,
+      {/* Check Circle - Centered vertically */}
+      <TouchableOpacity
+        onPress={onToggle}
+        disabled={!isEditable}
+        activeOpacity={0.7}
+        style={styles.checkCircleContainer}
+      >
+        <Animated.View
+          style={[
+            styles.completionIndicator,
             { 
-              backgroundColor: isCompleted ? colors.primary : colors.border,
-              opacity: isCompleted ? 1 : 0.3
-            }
-          ]} />
-        )}
-        <TouchableOpacity
-          onPress={onToggle}
-          disabled={!isEditable}
-          activeOpacity={0.7}
+              backgroundColor: isCompleted ? colors.primary : 'transparent',
+              borderColor: isCompleted ? colors.primary : colors.border
+            },
+            animatedIndicatorStyle,
+          ]}
         >
-          <Animated.View
-            style={[
-              styles.completionIndicator,
-              { 
-                backgroundColor: isCompleted ? colors.primary : 'transparent',
-                borderColor: isCompleted ? colors.primary : colors.border
-              },
-              animatedIndicatorStyle,
-            ]}
-          >
-            {isCompleted && (
-              <Animated.View style={animatedCheckmarkStyle}>
-                <Ionicons name="checkmark" size={12} color="white" />
-              </Animated.View>
-            )}
-          </Animated.View>
-        </TouchableOpacity>
-      </View>
+          {isCompleted && (
+            <Animated.View style={animatedCheckmarkStyle}>
+              <Ionicons name="checkmark" size={12} color="white" />
+            </Animated.View>
+          )}
+        </Animated.View>
+      </TouchableOpacity>
 
       {/* Habit Card */}
       <Animated.View style={[styles.habitCardWrapper, animatedCardStyle]}>
@@ -349,18 +339,13 @@ const styles = StyleSheet.create({
   },
   habitRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
   },
-  indicatorColumn: {
-    width: 24,
-    alignItems: 'center',
+  checkCircleContainer: {
     marginRight: 12,
-    position: 'relative',
-  },
-  indicatorLine: {
-    width: 2,
-    flex: 1,
-    marginBottom: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   completionIndicator: {
     width: 24,
