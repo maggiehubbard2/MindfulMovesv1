@@ -2,7 +2,7 @@ import { useHabits } from '@/context/HabitsContext';
 import { useTheme } from '@/context/ThemeContext';
 import { getHabitCompletionForDate } from '@/utils/habitCalendarUtils';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface WeeklyCalendarProps {
@@ -11,7 +11,7 @@ interface WeeklyCalendarProps {
 
 export default function WeeklyCalendar({ onDatePress }: WeeklyCalendarProps) {
   const { colors } = useTheme();
-  const { habits } = useHabits();
+  const { habits, selectedDate } = useHabits();
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const today = new Date();
@@ -107,6 +107,10 @@ export default function WeeklyCalendar({ onDatePress }: WeeklyCalendarProps) {
         {weekDates.map((date, index) => {
           const percentage = getCompletionPercentage(date);
           const isTodayDate = isToday(date);
+          const isSelectedDate =
+            selectedDate &&
+            date.toDateString() === selectedDate.toDateString();
+
           const dayName = dayNames[index];
           
           return (
@@ -119,7 +123,7 @@ export default function WeeklyCalendar({ onDatePress }: WeeklyCalendarProps) {
               <Text style={[
                 styles.dayName,
                 { 
-                  color: isTodayDate ? colors.text : colors.secondary,
+                  color: isSelectedDate ? colors.text : colors.secondary,
                   fontWeight: isTodayDate ? 'bold' : 'normal'
                 }
               ]}>

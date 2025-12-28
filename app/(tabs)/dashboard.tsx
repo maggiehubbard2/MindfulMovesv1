@@ -40,9 +40,7 @@ export default function DashboardScreen() {
   });
 
   const handleDatePress = (date: Date) => {
-    // Navigate to habits screen with the selected date
     setSelectedDate(date);
-   // router.push('/(tabs)/habits');
   };
 
   // Check if all habits are completed and trigger confetti
