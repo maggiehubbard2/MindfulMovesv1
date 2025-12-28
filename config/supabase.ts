@@ -60,5 +60,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     // Storage key for session persistence
     storageKey: 'supabase.auth.token',
   },
+  db: {
+    // Use faster schema lookup
+    schema: 'public',
+  },
 });
 
