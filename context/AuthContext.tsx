@@ -71,7 +71,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (session?.user) {
           setUser(session.user);
-          await fetchUserProfile(session.user.id);
+          // Defer profile fetch to not block initial render - use requestIdleCallback if available
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(() => {
+              fetchUserProfile(session.user.id);
+            });
+          } else {
+            setTimeout(() => {
+              fetchUserProfile(session.user.id);
+            }, 100);
+          }
         } else {
           setUser(null);
           setUserProfile(null);
@@ -95,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
-      console.log('Auth state changed:', event);
+      // Removed console.log for performance
       
       if (session?.user) {
         setUser(session.user);

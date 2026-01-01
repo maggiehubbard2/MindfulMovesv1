@@ -1,7 +1,7 @@
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 interface Habit {
   id: string;
@@ -26,9 +26,94 @@ interface HabitsContextType {
   getHabitsForDate: (date: Date) => Habit[];
   canEditDate: (date: Date) => boolean;
   resetHabitsForNewDay: () => Promise<void>;
+  calculateLongestStreak: () => number;
 }
 
 const HabitsContext = createContext<HabitsContextType | undefined>(undefined);
+
+/**
+ * Normalizes a date string to local day boundary (YYYY-MM-DD format)
+ * Ensures consistent date comparison regardless of timezone
+ * @param dateStr - ISO date string (YYYY-MM-DD format)
+ * @returns Normalized date string in YYYY-MM-DD format
+ */
+const normalizeDateToDay = (dateStr: string): string => {
+  // Parse the ISO date string and normalize to local day
+  // Add T00:00:00 to ensure we're working with the start of the day
+  const date = new Date(dateStr + 'T00:00:00');
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Calculates the longest consecutive streak of days where at least one habit was completed.
+ * 
+ * Algorithm:
+ * 1. Collect all completion dates from all habits
+ * 2. Deduplicate by calendar day (multiple habits on same day = 1 day)
+ * 3. Sort dates ascending
+ * 4. Walk through sorted dates and track longest consecutive run
+ * 
+ * @param habits - Array of habits with completionDates arrays
+ * @returns Number representing the longest consecutive streak in days (0 if no streak)
+ */
+const calculateLongestStreak = (habits: Habit[]): number => {
+  // Early return if no habits
+  if (!habits || habits.length === 0) {
+    return 0;
+  }
+
+  // Step 1: Collect all completion dates from all habits
+  // Use Set to automatically deduplicate dates
+  const allCompletionDates = new Set<string>();
+  
+  habits.forEach(habit => {
+    const completionDates = habit.completionDates || [];
+    completionDates.forEach(dateStr => {
+      if (dateStr && typeof dateStr === 'string') {
+        // Normalize to day boundary and add to set (automatically deduplicates)
+        const normalizedDate = normalizeDateToDay(dateStr);
+        allCompletionDates.add(normalizedDate);
+      }
+    });
+  });
+
+  // Step 2: Convert set to sorted array (already deduplicated by Set)
+  const uniqueDates = Array.from(allCompletionDates).sort();
+
+  // Early return if no completion dates
+  if (uniqueDates.length === 0) {
+    return 0;
+  }
+
+  // Step 3: Find longest consecutive streak
+  // Start with at least one day if we have dates
+  let longestStreak = 1;
+  let currentStreak = 1;
+
+  // Walk through sorted dates and find consecutive runs
+  for (let i = 1; i < uniqueDates.length; i++) {
+    const currentDate = new Date(uniqueDates[i] + 'T00:00:00');
+    const previousDate = new Date(uniqueDates[i - 1] + 'T00:00:00');
+    
+    // Calculate difference in days
+    const diffTime = currentDate.getTime() - previousDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1) {
+      // Consecutive day - increment current streak
+      currentStreak++;
+      longestStreak = Math.max(longestStreak, currentStreak);
+    } else {
+      // Gap found - reset current streak
+      currentStreak = 1;
+    }
+  }
+
+  return longestStreak;
+};
 
 export function HabitsProvider({ children }: { children: React.ReactNode }) {
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -38,39 +123,97 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   // Load habits from Supabase when user is authenticated
   useEffect(() => {
     if (user) {
-      loadHabitsFromSupabase();
-      checkAndResetHabits();
+      // Load from cache first for instant UI, then sync with server
+      loadHabitsFromCache();
+      // Defer Supabase load to not block initial render
+      const loadTimer = setTimeout(() => {
+        loadHabitsFromSupabase();
+      }, 50);
+      
+      // Defer reset check - run after a short delay to not block initial render
+      const resetTimer = setTimeout(() => {
+        checkAndResetHabits();
+      }, 200);
+      
+      // Optimize midnight check - only check when needed (near midnight)
+      const setupMidnightCheck = () => {
+        const now = new Date();
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        const msUntilMidnight = tomorrow.getTime() - now.getTime();
+        
+        // Check at midnight, then every hour after that (more efficient than every minute)
+        const midnightTimer = setTimeout(() => {
+          checkAndResetHabits();
+          // After midnight, check every hour
+          const hourlyInterval = setInterval(() => {
+            const currentHour = new Date().getHours();
+            // Only check at midnight (0) and 1am (to catch any edge cases)
+            if (currentHour === 0 || currentHour === 1) {
+              checkAndResetHabits();
+            }
+          }, 60 * 60 * 1000); // Every hour
+          
+          return () => clearInterval(hourlyInterval);
+        }, msUntilMidnight);
+        
+        return () => clearTimeout(midnightTimer);
+      };
+      
+      const cleanup = setupMidnightCheck();
+      
+      return () => {
+        clearTimeout(loadTimer);
+        clearTimeout(resetTimer);
+        cleanup?.();
+      };
     } else {
       setHabits([]);
     }
   }, [user]);
 
-  // Check for midnight reset on mount and when date changes
-  useEffect(() => {
-    if (user) {
-      checkAndResetHabits();
-      // Set up interval to check for midnight reset every minute
-      const interval = setInterval(() => {
-        checkAndResetHabits();
-      }, 60000); // Check every minute
-      
-      return () => clearInterval(interval);
+  // Load from cache first for instant UI
+  const loadHabitsFromCache = async () => {
+    try {
+      const savedHabits = await AsyncStorage.getItem('habits');
+      if (savedHabits) {
+        const parsed = JSON.parse(savedHabits);
+        const habitsWithDates = parsed.map((h: any) => ({
+          ...h,
+          completionDates: h.completionDates || h.completion_dates || [],
+          createdAt: h.createdAt ? new Date(h.createdAt) : new Date(),
+          completedAt: h.completedAt ? new Date(h.completedAt) : undefined,
+        }));
+        // Update today's completion status
+        const today = getTodayDateString();
+        const updatedHabits = habitsWithDates.map((h: Habit) => ({
+          ...h,
+          completed: (h.completionDates || []).includes(today),
+        }));
+        setHabits(updatedHabits);
+      }
+    } catch (error) {
+      // Silent fail - will load from Supabase
     }
-  }, [user]);
+  };
 
   const loadHabitsFromSupabase = async () => {
     if (!user) return;
     
     try {
+      // Optimize: Only select needed fields, use single() if expecting one result
+      // Add limit if you expect many habits to prevent large payloads
       const { data, error } = await supabase
         .from('habit')
-        .select('*')
+        .select('id, name, description, completed, user_id, created_at, completed_at, completion_dates')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true })
+        .limit(100); // Prevent huge payloads
       
       if (error) throw error;
       
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayDateString();
       const supabaseHabits: Habit[] = (data || []).map((habit: any) => {
         const completionDates = habit.completion_dates || [];
         const isCompletedToday = completionDates.includes(today);
@@ -87,40 +230,66 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         };
       });
       
+      // Update state immediately for UI
       setHabits(supabaseHabits);
+      
+      // Defer AsyncStorage write to not block UI - use requestIdleCallback if available
+      const saveToCache = () => {
+        AsyncStorage.setItem('habits', JSON.stringify(supabaseHabits)).catch(() => {
+          // Silent fail for cache writes
+        });
+      };
+      
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(saveToCache);
+      } else {
+        setTimeout(saveToCache, 0);
+      }
     } catch (error) {
-      console.error('Error loading habits from Supabase:', error);
-      // Fall back to local storage if Supabase fails
-      const savedHabits = await AsyncStorage.getItem('habits');
-      if (savedHabits) {
-        const parsed = JSON.parse(savedHabits);
-        // Ensure completionDates exists for backward compatibility
-        const habitsWithDates = parsed.map((h: any) => ({
-          ...h,
-          completionDates: h.completionDates || h.completion_dates || [],
-          createdAt: h.createdAt ? new Date(h.createdAt) : new Date(),
-        }));
-        setHabits(habitsWithDates);
+      // Silent error - already have cache data displayed
+      // Only log in development
+      if (__DEV__) {
+        console.error('Error loading habits from Supabase:', error);
       }
     }
   };
+
+  // Cache today's date string to avoid repeated calculations
+  const getTodayDateString = ((): (() => string) => {
+    let cached: string | undefined;
+    let cachedKey: string | undefined;
+    
+    return () => {
+      const now = new Date();
+      const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+      if (!cached || cachedKey !== todayKey) {
+        cached = now.toISOString().split('T')[0];
+        cachedKey = todayKey;
+      }
+      return cached;
+    };
+  })();
 
   // Check if we need to reset habits for a new day
   const checkAndResetHabits = async () => {
     if (!user) return;
     
-    const lastResetDate = await AsyncStorage.getItem('lastHabitResetDate');
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (lastResetDate !== today) {
-      await resetHabitsForNewDay();
-      await AsyncStorage.setItem('lastHabitResetDate', today);
+    try {
+      const lastResetDate = await AsyncStorage.getItem('lastHabitResetDate');
+      const today = getTodayDateString();
+      
+      if (lastResetDate !== today) {
+        await resetHabitsForNewDay();
+        await AsyncStorage.setItem('lastHabitResetDate', today);
+      }
+    } catch (error) {
+      // Silent fail - not critical for app startup
     }
   };
 
   // Reset habits for new day - archive completions but keep habit definitions
   const resetHabitsForNewDay = async () => {
-    if (!user) return;
+    if (!user || habits.length === 0) return;
     
     // Update all habits to reset completed status for today
     const updatedHabits = habits.map(habit => ({
@@ -129,26 +298,36 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       // Keep completionDates array for historical tracking
     }));
 
-    // Update in Supabase
+    // Optimize: Batch update all habits in a single query instead of individual updates
     try {
-      const updatePromises = updatedHabits.map(habit =>
-        supabase
-          .from('habit')
-          .update({ completed: false })
-          .eq('id', habit.id)
-          .then(({ error }) => {
-            if (error) {
-              console.error(`Error resetting habit ${habit.id}:`, error);
-            }
-          })
-      );
-      await Promise.all(updatePromises);
+      const habitIds = updatedHabits.map(h => h.id);
+      const { error } = await supabase
+        .from('habit')
+        .update({ completed: false })
+        .in('id', habitIds);
+      
+      if (error) {
+        console.error('Error resetting habits in Supabase:', error);
+        // Fallback to individual updates if batch fails
+        await Promise.all(updatedHabits.map(habit =>
+          supabase
+            .from('habit')
+            .update({ completed: false })
+            .eq('id', habit.id)
+            .then(({ error }) => {
+              if (error) {
+                console.error(`Error resetting habit ${habit.id}:`, error);
+              }
+            })
+        ));
+      }
     } catch (error) {
       console.error('Error resetting habits in Supabase:', error);
     }
 
     setHabits(updatedHabits);
-    await AsyncStorage.setItem('habits', JSON.stringify(updatedHabits));
+    // Defer AsyncStorage write to not block UI
+    AsyncStorage.setItem('habits', JSON.stringify(updatedHabits)).catch(console.error);
   };
 
   const addHabit = async (name: string, description?: string) => {
@@ -247,7 +426,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
 
     const targetDate = date || selectedDate;
     const dateStr = targetDate.toISOString().split('T')[0];
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayDateString();
     
     // Check if we can edit this date
     if (!canEditDate(targetDate)) {
@@ -297,7 +476,8 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Get habits for a specific date (with completion status for that date)
-  const getHabitsForDate = (date: Date): Habit[] => {
+  // Memoized to prevent unnecessary recalculations
+  const getHabitsForDate = useCallback((date: Date): Habit[] => {
     const dateStr = date.toISOString().split('T')[0];
     return habits.map(habit => {
       const isCompleted = (habit.completionDates || []).includes(dateStr);
@@ -306,10 +486,11 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         completed: isCompleted,
       };
     });
-  };
+  }, [habits]);
 
   // Check if a date can be edited (only up to 2 days prior, no future dates)
-  const canEditDate = (date: Date): boolean => {
+  // Memoized with useMemo for the date calculation
+  const canEditDate = useCallback((date: Date): boolean => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const targetDate = new Date(date);
@@ -325,7 +506,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
     
     return targetDate >= twoDaysAgo;
-  };
+  }, []);
 
   const removeHabit = async (id: string) => {
     try {
@@ -361,6 +542,9 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     // If needed, we could add an 'order' field to each habit row
   };
 
+  // Calculate longest streak - memoized to avoid recalculating on every render
+  const longestStreak = React.useMemo(() => calculateLongestStreak(habits), [habits]);
+
   return (
     <HabitsContext.Provider value={{ 
       habits, 
@@ -374,6 +558,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       getHabitsForDate,
       canEditDate,
       resetHabitsForNewDay,
+      calculateLongestStreak: () => longestStreak,
     }}>
       {children}
     </HabitsContext.Provider>
@@ -387,3 +572,4 @@ export function useHabits() {
   }
   return context;
 }
+

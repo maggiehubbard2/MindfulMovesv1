@@ -9,17 +9,14 @@ export default function Index() {
 
   useEffect(() => {
     if (loading) {
-      console.log('[Index] Auth loading...');
       return;
     }
 
     if (user) {
       // User is authenticated, redirect to dashboard
-      console.log('[Index] User authenticated, routing to /(tabs)/dashboard');
       router.replace('/(tabs)/dashboard');
     } else {
       // User is not authenticated, redirect to login
-      console.log('[Index] No user, routing to /login');
       router.replace('/login');
     }
   }, [user, loading]);

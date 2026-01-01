@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 
 type AccentColorKey = 'blue' | 'pink' | 'green' | 'purple' | 'custom';
 
-interface ThemeContextType {
+export interface ThemeContextType {
   isDarkMode: boolean;
   toggleDarkMode: () => void;
   colors: {
