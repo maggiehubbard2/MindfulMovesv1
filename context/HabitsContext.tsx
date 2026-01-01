@@ -1,7 +1,7 @@
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 interface Habit {
   id: string;
@@ -26,9 +26,94 @@ interface HabitsContextType {
   getHabitsForDate: (date: Date) => Habit[];
   canEditDate: (date: Date) => boolean;
   resetHabitsForNewDay: () => Promise<void>;
+  calculateLongestStreak: () => number;
 }
 
 const HabitsContext = createContext<HabitsContextType | undefined>(undefined);
+
+/**
+ * Normalizes a date string to local day boundary (YYYY-MM-DD format)
+ * Ensures consistent date comparison regardless of timezone
+ * @param dateStr - ISO date string (YYYY-MM-DD format)
+ * @returns Normalized date string in YYYY-MM-DD format
+ */
+const normalizeDateToDay = (dateStr: string): string => {
+  // Parse the ISO date string and normalize to local day
+  // Add T00:00:00 to ensure we're working with the start of the day
+  const date = new Date(dateStr + 'T00:00:00');
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Calculates the longest consecutive streak of days where at least one habit was completed.
+ * 
+ * Algorithm:
+ * 1. Collect all completion dates from all habits
+ * 2. Deduplicate by calendar day (multiple habits on same day = 1 day)
+ * 3. Sort dates ascending
+ * 4. Walk through sorted dates and track longest consecutive run
+ * 
+ * @param habits - Array of habits with completionDates arrays
+ * @returns Number representing the longest consecutive streak in days (0 if no streak)
+ */
+const calculateLongestStreak = (habits: Habit[]): number => {
+  // Early return if no habits
+  if (!habits || habits.length === 0) {
+    return 0;
+  }
+
+  // Step 1: Collect all completion dates from all habits
+  // Use Set to automatically deduplicate dates
+  const allCompletionDates = new Set<string>();
+  
+  habits.forEach(habit => {
+    const completionDates = habit.completionDates || [];
+    completionDates.forEach(dateStr => {
+      if (dateStr && typeof dateStr === 'string') {
+        // Normalize to day boundary and add to set (automatically deduplicates)
+        const normalizedDate = normalizeDateToDay(dateStr);
+        allCompletionDates.add(normalizedDate);
+      }
+    });
+  });
+
+  // Step 2: Convert set to sorted array (already deduplicated by Set)
+  const uniqueDates = Array.from(allCompletionDates).sort();
+
+  // Early return if no completion dates
+  if (uniqueDates.length === 0) {
+    return 0;
+  }
+
+  // Step 3: Find longest consecutive streak
+  // Start with at least one day if we have dates
+  let longestStreak = 1;
+  let currentStreak = 1;
+
+  // Walk through sorted dates and find consecutive runs
+  for (let i = 1; i < uniqueDates.length; i++) {
+    const currentDate = new Date(uniqueDates[i] + 'T00:00:00');
+    const previousDate = new Date(uniqueDates[i - 1] + 'T00:00:00');
+    
+    // Calculate difference in days
+    const diffTime = currentDate.getTime() - previousDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1) {
+      // Consecutive day - increment current streak
+      currentStreak++;
+      longestStreak = Math.max(longestStreak, currentStreak);
+    } else {
+      // Gap found - reset current streak
+      currentStreak = 1;
+    }
+  }
+
+  return longestStreak;
+};
 
 export function HabitsProvider({ children }: { children: React.ReactNode }) {
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -170,15 +255,20 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Cache today's date string to avoid repeated calculations
-  const getTodayDateString = () => {
-    const now = new Date();
-    const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
-    if (!getTodayDateString.cached || getTodayDateString.cachedKey !== todayKey) {
-      getTodayDateString.cached = now.toISOString().split('T')[0];
-      getTodayDateString.cachedKey = todayKey;
-    }
-    return getTodayDateString.cached;
-  };
+  const getTodayDateString = ((): (() => string) => {
+    let cached: string | undefined;
+    let cachedKey: string | undefined;
+    
+    return () => {
+      const now = new Date();
+      const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+      if (!cached || cachedKey !== todayKey) {
+        cached = now.toISOString().split('T')[0];
+        cachedKey = todayKey;
+      }
+      return cached;
+    };
+  })();
 
   // Check if we need to reset habits for a new day
   const checkAndResetHabits = async () => {
@@ -452,6 +542,9 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     // If needed, we could add an 'order' field to each habit row
   };
 
+  // Calculate longest streak - memoized to avoid recalculating on every render
+  const longestStreak = React.useMemo(() => calculateLongestStreak(habits), [habits]);
+
   return (
     <HabitsContext.Provider value={{ 
       habits, 
@@ -465,6 +558,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       getHabitsForDate,
       canEditDate,
       resetHabitsForNewDay,
+      calculateLongestStreak: () => longestStreak,
     }}>
       {children}
     </HabitsContext.Provider>
