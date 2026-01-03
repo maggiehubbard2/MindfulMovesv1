@@ -65,28 +65,56 @@ function HabitItem({
     }
   };
 
+  const isCompleted = habit.completed;
+
   const content = (
     <TouchableOpacity
       onLongPress={isEditable ? drag : undefined}
       activeOpacity={0.7}
       style={[
         styles.habitItem,
-        { backgroundColor: colors.card },
+        { 
+          backgroundColor: colors.card,
+          opacity: isCompleted ? 0.5 : 1, // Reduce opacity for completed habits
+        },
         isActive && styles.habitItemActive,
       ]}
     >
       {/* Hamburger icon - visual indicator only, drag works via row long-press */}
       {isEditable && (
         <View style={styles.dragHandle}>
-          <Ionicons name="reorder-three-outline" size={24} color={colors.secondary} />
+          <Ionicons 
+            name="reorder-three-outline" 
+            size={24} 
+            color={isCompleted ? colors.secondary + '80' : colors.secondary} // Grey out for completed
+          />
         </View>
       )}
 
       <View style={styles.habitInfo}>
         <View style={styles.habitDetails}>
-          <Text style={[styles.habitName, { color: colors.text }]}>{habit.name}</Text>
+          <Text 
+            style={[
+              styles.habitName, 
+              { 
+                color: isCompleted ? colors.secondary : colors.text, // Muted text color for completed
+                textDecorationLine: isCompleted ? 'line-through' : 'none',
+                textDecorationColor: colors.secondary, // Make strikethrough more visible
+              }
+            ]}
+          >
+            {habit.name}
+          </Text>
           {habit.description && (
-            <Text style={[styles.descriptionText, { color: colors.secondary }]}>
+            <Text 
+              style={[
+                styles.descriptionText, 
+                { 
+                  color: isCompleted ? colors.secondary + 'CC' : colors.secondary, // More muted for completed
+                  opacity: isCompleted ? 0.7 : 1,
+                }
+              ]}
+            >
               {habit.description}
             </Text>
           )}
@@ -100,7 +128,11 @@ function HabitItem({
           onPress={handleEdit}
           activeOpacity={0.7}
         >
-          <Ionicons name="pencil-outline" size={20} color={colors.primary} />
+          <Ionicons 
+            name="pencil-outline" 
+            size={20} 
+            color={isCompleted ? colors.primary + '80' : colors.primary} // Grey out for completed
+          />
         </TouchableOpacity>
       )}
 

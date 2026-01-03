@@ -85,7 +85,7 @@ export default function DashboardScreen() {
         const streak = calculateLongestStreak();
         
       
-        if (streak > 1) {
+        if (streak > 0) {
           setShowShareScreen(true);
         }
       }, 3000);
