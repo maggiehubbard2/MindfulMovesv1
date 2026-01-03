@@ -120,10 +120,16 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
     );
   }
 
-const weekday =
-  selectedDate
-    ? selectedDate.toLocaleDateString('en-US', { weekday: 'long' })
-    : 'Daily';
+const isToday = selectedDate
+  ? selectedDate.toDateString() === new Date().toDateString()
+  : false;
+
+const weekday = !selectedDate
+  ? 'Daily'
+  : isToday
+  ? 'Today\'s'
+  : selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
+
 
 
   return (
