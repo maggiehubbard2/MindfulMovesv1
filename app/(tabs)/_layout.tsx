@@ -91,7 +91,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="streak"
         options={{
-          title: 'Progress',
+          title: 'Calendar',
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="flame-outline" size={size} color={color} />
