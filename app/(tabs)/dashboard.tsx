@@ -92,11 +92,6 @@ export default function DashboardScreen() {
     } else {
       // Don't show confetti for other state transitions (true→false, true→true, or initial render)
       setShowConfetti(false);
-      setShowShareWin(false);
-      wasAllCompletedRef.current = false;
-      // Clear any pending timeouts if habits are unchecked or date changes
-      if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
-      if (shareWinTimeoutRef.current) clearTimeout(shareWinTimeoutRef.current);
     }
     
     // Update the ref with current state for next comparison
@@ -106,11 +101,6 @@ export default function DashboardScreen() {
   // Check when habits change
   useEffect(() => {
     checkAllHabitsCompleted();
-    return () => {
-      // Cleanup on unmount or dependency change
-      if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
-      if (shareWinTimeoutRef.current) clearTimeout(shareWinTimeoutRef.current);
-    };
   }, [selectedDate, habits]);
 
   // Reset confetti and previous state when date changes
