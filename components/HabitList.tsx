@@ -2,18 +2,14 @@ import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import DraggableFlatList, {
+  RenderItemParams,
+  ScaleDecorator,
+} from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
-import Animated, {
-  useAnimatedGestureHandler,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  runOnJS,
-} from 'react-native-reanimated';
-import { PanGestureHandler } from 'react-native-gesture-handler';
 
 interface Habit {
   id: string;
@@ -31,69 +27,27 @@ interface HabitListProps {
   isEditable?: boolean;
 }
 
-const DRAG_THRESHOLD = 50;
-
-function DraggableHabitItem({
+function HabitItem({
   habit,
-  index,
-  totalItems,
+  drag,
+  isActive,
   colors,
   onToggleHabit,
   onRemoveHabit,
   onUpdateHabit,
-  onReorderHabits,
   isEditable,
+  useScaleDecorator = true,
 }: {
   habit: Habit;
-  index: number;
-  totalItems: number;
+  drag: () => void;
+  isActive: boolean;
   colors: any;
   onToggleHabit: (id: string) => void;
   onRemoveHabit: (id: string) => void;
   onUpdateHabit?: (id: string, name: string, description?: string) => void;
-  onReorderHabits?: (fromIndex: number, toIndex: number) => void;
   isEditable?: boolean;
+  useScaleDecorator?: boolean;
 }) {
-  const [isDragging, setIsDragging] = useState(false);
-  const translateY = useSharedValue(0);
-  const opacity = useSharedValue(1);
-
-  const gestureHandler = useAnimatedGestureHandler({
-    onStart: () => {
-      opacity.value = 0.8;
-      runOnJS(setIsDragging)(true);
-    },
-    onActive: (event) => {
-      translateY.value = event.translationY;
-    },
-    onEnd: (event) => {
-      const threshold = 30;
-      let newIndex = index;
-      
-      if (event.translationY > threshold && index < totalItems - 1) {
-        newIndex = index + 1;
-      } else if (event.translationY < -threshold && index > 0) {
-        newIndex = index - 1;
-      }
-      
-      if (newIndex !== index && onReorderHabits) {
-        runOnJS(onReorderHabits)(index, newIndex);
-      }
-      
-      translateY.value = withSpring(0);
-      opacity.value = withSpring(1);
-      runOnJS(setIsDragging)(false);
-    },
-  });
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateY: translateY.value }],
-      opacity: opacity.value,
-      zIndex: isDragging ? 1000 : 1,
-    };
-  });
-
   const renderRightActions = () => {
     return (
       <TouchableOpacity
@@ -111,63 +65,99 @@ function DraggableHabitItem({
     }
   };
 
-  return (
-    <Swipeable renderRightActions={renderRightActions}>
-      <Animated.View style={animatedStyle}>
-        <View style={[styles.habitItem, { backgroundColor: colors.card }]}>
-          {/* Drag Handle */}
-          {isEditable && onReorderHabits && (
-            <PanGestureHandler
-              onGestureEvent={gestureHandler}
-              activeOffsetY={[-10, 10]}
-            >
-              <Animated.View>
-                <TouchableOpacity
-                  style={styles.dragHandle}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="reorder-three-outline" size={24} color={colors.secondary} />
-                </TouchableOpacity>
-              </Animated.View>
-            </PanGestureHandler>
-          )}
+  const isCompleted = habit.completed;
 
-          <View style={styles.habitInfo}>
-            <View style={styles.habitDetails}>
-              <Text style={[styles.habitName, { color: colors.text }]}>{habit.name}</Text>
-              {habit.description && (
-                <Text style={[styles.descriptionText, { color: colors.secondary }]}>
-                  {habit.description}
-                </Text>
-              )}
-            </View>
-          </View>
-
-          {/* Edit Button */}
-          {isEditable && onUpdateHabit && (
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={handleEdit}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="pencil-outline" size={20} color={colors.primary} />
-            </TouchableOpacity>
-          )}
-
-          {/* Checkbox */}
-          <TouchableOpacity
-            style={[
-              styles.checkbox,
-              habit.completed && { backgroundColor: colors.primary }
-            ]}
-            onPress={() => onToggleHabit(habit.id)}
-          >
-            {habit.completed && (
-              <Ionicons name="checkmark" size={20} color="white" />
-            )}
-          </TouchableOpacity>
+  const content = (
+    <TouchableOpacity
+      onLongPress={isEditable ? drag : undefined}
+      activeOpacity={0.7}
+      style={[
+        styles.habitItem,
+        { 
+          backgroundColor: colors.card,
+          opacity: isCompleted ? 0.5 : 1, // Reduce opacity for completed habits
+        },
+        isActive && styles.habitItemActive,
+      ]}
+    >
+      {/* Hamburger icon - visual indicator only, drag works via row long-press */}
+      {isEditable && (
+        <View style={styles.dragHandle}>
+          <Ionicons 
+            name="reorder-three-outline" 
+            size={24} 
+            color={isCompleted ? colors.secondary + '80' : colors.secondary} // Grey out for completed
+          />
         </View>
-      </Animated.View>
+      )}
+
+      <View style={styles.habitInfo}>
+        <View style={styles.habitDetails}>
+          <Text 
+            style={[
+              styles.habitName, 
+              { 
+                color: isCompleted ? colors.secondary : colors.text, // Muted text color for completed
+                textDecorationLine: isCompleted ? 'line-through' : 'none',
+                textDecorationColor: colors.secondary, // Make strikethrough more visible
+              }
+            ]}
+          >
+            {habit.name}
+          </Text>
+          {habit.description && (
+            <Text 
+              style={[
+                styles.descriptionText, 
+                { 
+                  color: isCompleted ? colors.secondary + 'CC' : colors.secondary, // More muted for completed
+                  opacity: isCompleted ? 0.7 : 1,
+                }
+              ]}
+            >
+              {habit.description}
+            </Text>
+          )}
+        </View>
+      </View>
+
+      {/* Edit Button */}
+      {isEditable && onUpdateHabit && (
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={handleEdit}
+          activeOpacity={0.7}
+        >
+          <Ionicons 
+            name="pencil-outline" 
+            size={20} 
+            color={isCompleted ? colors.primary + '80' : colors.primary} // Grey out for completed
+          />
+        </TouchableOpacity>
+      )}
+
+      {/* Checkbox */}
+      <TouchableOpacity
+        style={[
+          styles.checkbox,
+          habit.completed && { backgroundColor: colors.primary }
+        ]}
+        onPress={() => onToggleHabit(habit.id)}
+      >
+        {habit.completed && (
+          <Ionicons name="checkmark" size={20} color="white" />
+        )}
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+
+  return (
+    <Swipeable renderRightActions={renderRightActions} enabled={!isActive}>
+      {useScaleDecorator ? (
+        <ScaleDecorator>{content}</ScaleDecorator>
+      ) : (
+        content
+      )}
     </Swipeable>
   );
 }
@@ -181,6 +171,43 @@ export default function HabitList({
   isEditable = true,
 }: HabitListProps) {
   const { colors } = useTheme();
+  const [data, setData] = useState(habits);
+
+  // Update local data when habits prop changes
+  React.useEffect(() => {
+    setData(habits);
+  }, [habits]);
+
+  // Handle drag end - update order and call parent callback
+  const handleDragEnd = useCallback(
+  ({ from, to, data }: { from: number; to: number; data: Habit[] }) => {
+    setData(data);
+
+    if (onReorderHabits && from !== to) {
+      onReorderHabits(from, to);
+    }
+  },
+  [onReorderHabits]
+);
+
+
+  const renderItem = useCallback(
+    ({ item, drag, isActive }: RenderItemParams<Habit>) => {
+      return (
+        <HabitItem
+          habit={item}
+          drag={drag}
+          isActive={isActive}
+          colors={colors}
+          onToggleHabit={onToggleHabit}
+          onRemoveHabit={onRemoveHabit}
+          onUpdateHabit={onUpdateHabit}
+          isEditable={isEditable}
+        />
+      );
+    },
+    [colors, onToggleHabit, onRemoveHabit, onUpdateHabit, isEditable]
+  );
 
   if (habits.length === 0) {
     return (
@@ -206,22 +233,38 @@ export default function HabitList({
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <StatusBar style="auto" />
         <View style={styles.container}>
-          <ScrollView style={styles.habitList}>
-            {habits.map((habit, index) => (
-              <DraggableHabitItem
-                key={habit.id}
-                habit={habit}
-                index={index}
-                totalItems={habits.length}
-                colors={colors}
-                onToggleHabit={onToggleHabit}
-                onRemoveHabit={onRemoveHabit}
-                onUpdateHabit={onUpdateHabit}
-                onReorderHabits={onReorderHabits}
-                isEditable={isEditable}
-              />
-            ))}
-          </ScrollView>
+          {isEditable && onReorderHabits ? (
+            <DraggableFlatList
+              data={data}
+              onDragEnd={handleDragEnd}
+              keyExtractor={(item: Habit) => item.id}
+              renderItem={renderItem}
+              contentContainerStyle={styles.habitList}
+              // Allow default long-press behavior on the entire row
+              animationConfig={{
+                damping: 20,
+                mass: 0.5,
+                stiffness: 100,
+              }}
+            />
+          ) : (
+            <View style={styles.habitList}>
+              {habits.map((habit: Habit) => (
+                <HabitItem
+                  key={habit.id}
+                  habit={habit}
+                  drag={() => {}}
+                  isActive={false}
+                  colors={colors}
+                  onToggleHabit={onToggleHabit}
+                  onRemoveHabit={onRemoveHabit}
+                  onUpdateHabit={onUpdateHabit}
+                  isEditable={isEditable}
+                  useScaleDecorator={false}
+                />
+              ))}
+            </View>
+          )}
         </View>
       </SafeAreaView>
     </GestureHandlerRootView>
@@ -264,7 +307,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   habitList: {
-    flex: 1,
+    paddingBottom: 16,
   },
   habitItem: {
     flexDirection: 'row',
@@ -273,7 +316,6 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 8,
     borderRadius: 12,
-    borderBottomWidth: 0,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -283,9 +325,21 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
+  habitItemActive: {
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    elevation: 8,
+    opacity: 0.95,
+  },
   dragHandle: {
     marginRight: 12,
     padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   habitInfo: {
     flex: 1,

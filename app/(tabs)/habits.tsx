@@ -80,9 +80,6 @@ export default function HabitsScreen() {
               <Text style={[styles.greeting, { color: colors.text }]}>
                 {userProfile?.firstName ? `${userProfile.firstName}'s Habits` : 'Your Habits'}
               </Text>
-              <Text style={[styles.headerTitle, { color: colors.text }]}>
-                You don't rise to the level of your goals, you fall to your systems.
-              </Text>
             </View>
             <TouchableOpacity
               style={[styles.addButton, { backgroundColor: colors.primary }]}
@@ -255,11 +252,6 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 4,
-  },
-  headerTitle: {
-    fontSize: 10,
-    fontWeight: '600',
-    opacity: 0.7,
   },
   addButton: {
     width: 44,

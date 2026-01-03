@@ -3,7 +3,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { getMonthDates } from '@/utils/calendarUtils';
 import { getHabitCompletionForDate, getHabitMonthStats } from '@/utils/habitCalendarUtils';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ProgressCircle from './ProgressCircle';
 
@@ -15,20 +15,14 @@ export default function MonthCalendar({ onDatePress }: MonthCalendarProps) {
   const { colors } = useTheme();
   const { habits } = useHabits();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [refreshKey, setRefreshKey] = useState(0);
   
-  // Force recalculation when habits change
-  useEffect(() => {
-    setRefreshKey(prev => prev + 1);
-  }, [habits]);
+  const displayedYear = currentDate.getFullYear();
+  const displayedMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
   
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
-  
-  const monthDates = getMonthDates(currentYear, currentMonth);
+  const monthDates = getMonthDates(displayedYear, displayedMonth);
   const monthStats = useMemo(() => 
-    getHabitMonthStats(habits, currentYear, currentMonth),
-    [habits, currentYear, currentMonth, refreshKey]
+    getHabitMonthStats(habits, displayedYear, displayedMonth),
+    [habits, displayedYear, displayedMonth]
   );
   
   const monthNames = [
@@ -48,8 +42,9 @@ export default function MonthCalendar({ onDatePress }: MonthCalendarProps) {
     setCurrentDate(newDate);
   };
   
-  const isCurrentMonth = (date: Date) => {
-    return date.getMonth() === currentMonth - 1 && date.getFullYear() === currentYear;
+  // Check if a date belongs to the displayed month (not the real-world current month)
+  const isDisplayedMonth = (date: Date) => {
+    return date.getMonth() === displayedMonth - 1 && date.getFullYear() === displayedYear;
   };
   
   const isToday = (date: Date) => {
@@ -60,9 +55,11 @@ export default function MonthCalendar({ onDatePress }: MonthCalendarProps) {
   };
   
   const getCompletionPercentage = useCallback((date: Date) => {
-    if (!isCurrentMonth(date)) return 0;
+    // Only show progress for dates in the displayed month
+    // Leading/trailing filler dates from adjacent months return 0
+    if (!isDisplayedMonth(date)) return 0;
     return getHabitCompletionForDate(habits, date);
-  }, [habits, refreshKey]);
+  }, [habits, displayedYear, displayedMonth]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -76,7 +73,7 @@ export default function MonthCalendar({ onDatePress }: MonthCalendarProps) {
         </TouchableOpacity>
         
         <Text style={[styles.monthTitle, { color: colors.text }]}>
-          {monthNames[currentMonth - 1]} {currentYear}
+          {monthNames[displayedMonth - 1]} {displayedYear}
         </Text>
         
         <TouchableOpacity 
@@ -136,7 +133,7 @@ export default function MonthCalendar({ onDatePress }: MonthCalendarProps) {
       <View style={styles.calendarGrid}>
         {monthDates.map((date, index) => {
           const percentage = getCompletionPercentage(date);
-          const isCurrentMonthDate = isCurrentMonth(date);
+          const isDisplayedMonthDate = isDisplayedMonth(date);
           const isTodayDate = isToday(date);
           
           return (
@@ -145,25 +142,25 @@ export default function MonthCalendar({ onDatePress }: MonthCalendarProps) {
               style={[
                 styles.dateCell,
                 { 
-                  backgroundColor: isCurrentMonthDate ? 'transparent' : colors.background,
+                  backgroundColor: isDisplayedMonthDate ? 'transparent' : colors.background,
                   borderColor: colors.border,
                 },
                 isTodayDate && { backgroundColor: colors.primary + '20' }
               ]}
-              onPress={() => isCurrentMonthDate && onDatePress?.(date)}
-              disabled={!isCurrentMonthDate}
+              onPress={() => isDisplayedMonthDate && onDatePress?.(date)}
+              disabled={!isDisplayedMonthDate}
             >
               <Text style={[
                 styles.dateText,
                 { 
-                  color: isCurrentMonthDate ? colors.text : colors.secondary,
+                  color: isDisplayedMonthDate ? colors.text : colors.secondary,
                   fontWeight: isTodayDate ? 'bold' : 'normal'
                 }
               ]}>
                 {date.getDate()}
               </Text>
               
-              {isCurrentMonthDate && (
+              {isDisplayedMonthDate && (
                 <ProgressCircle
                   percentage={percentage}
                   size={28}

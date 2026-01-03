@@ -120,10 +120,16 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
     );
   }
 
-const weekday =
-  selectedDate
-    ? selectedDate.toLocaleDateString('en-US', { weekday: 'long' })
-    : 'Daily';
+const isToday = selectedDate
+  ? selectedDate.toDateString() === new Date().toDateString()
+  : false;
+
+const weekday = !selectedDate
+  ? 'Daily'
+  : isToday
+  ? 'Today\'s'
+  : selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
+
 
 
   return (
@@ -251,8 +257,13 @@ function AnimatedHabitRow({ habit, index, isLast, icon, colors, isEditable, stre
         <TouchableOpacity
           style={[
             styles.habitCard,
-            { backgroundColor: colors.card },
-            !isEditable && { opacity: 0.7 }
+            { 
+              backgroundColor: colors.card,
+              // Reduce opacity for completed habits, further reduce if not editable
+              opacity: !isEditable 
+                ? (isCompleted ? 0.35 : 0.7)
+                : (isCompleted ? 0.5 : 1),
+            }
           ]}
           onPress={onToggle}
           activeOpacity={0.7}
@@ -261,9 +272,15 @@ function AnimatedHabitRow({ habit, index, isLast, icon, colors, isEditable, stre
           {/* Icon */}
           <View style={[
             styles.iconContainer,
-            { backgroundColor: icon.color + '20' }
+            { 
+              backgroundColor: isCompleted ? icon.color + '10' : icon.color + '20', // More desaturated for completed
+            }
           ]}>
-            <Ionicons name={icon.name as any} size={24} color={icon.color} />
+            <Ionicons 
+              name={icon.name as any} 
+              size={24} 
+              color={isCompleted ? icon.color + '80' : icon.color} // Grey out icon for completed
+            />
           </View>
 
           {/* Habit Info */}
@@ -273,9 +290,9 @@ function AnimatedHabitRow({ habit, index, isLast, icon, colors, isEditable, stre
                 style={[
                   styles.habitName,
                   { 
-                    color: colors.text,
+                    color: isCompleted ? colors.secondary : colors.text, // Muted text color for completed
                     textDecorationLine: isCompleted ? 'line-through' : 'none',
-                    opacity: isCompleted ? 0.6 : 1,
+                    textDecorationColor: colors.secondary, // Make strikethrough more visible
                   }
                 ]}
                 numberOfLines={1}
@@ -294,7 +311,16 @@ function AnimatedHabitRow({ habit, index, isLast, icon, colors, isEditable, stre
               )}
             </View>
             {habit.description && (
-              <Text style={[styles.habitDescription, { color: colors.secondary }]} numberOfLines={1}>
+              <Text 
+                style={[
+                  styles.habitDescription, 
+                  { 
+                    color: isCompleted ? colors.secondary + 'CC' : colors.secondary, // More muted for completed
+                    opacity: isCompleted ? 0.7 : 1,
+                  }
+                ]} 
+                numberOfLines={1}
+              >
                 {habit.description}
               </Text>
             )}

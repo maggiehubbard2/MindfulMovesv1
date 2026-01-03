@@ -1,6 +1,6 @@
 import DailyHabitList from '@/components/DailyHabitList';
 import ReminderCard from '@/components/ReminderCard';
-import ShareWinScreen from '@/components/ShareWinScreen';
+import ShareStreakScreen from '@/components/ShareStreakScreen';
 import WeeklyCalendar from '@/components/WeeklyCalendar';
 import { useAuth } from '@/context/AuthContext';
 import { useHabits } from '@/context/HabitsContext';
@@ -16,12 +16,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function DashboardScreen() {
   const { colors, isDarkMode } = useTheme();
   const { userProfile } = useAuth();
-  const { setSelectedDate, getHabitsForDate, selectedDate, habits } = useHabits();
+  const { setSelectedDate, getHabitsForDate, selectedDate, habits, calculateLongestStreak } = useHabits();
   const [showConfetti, setShowConfetti] = useState(false);
-  const [showShareWin, setShowShareWin] = useState(false);
-  const confettiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const shareWinTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const wasAllCompletedRef = useRef(false);
+  const [showShareScreen, setShowShareScreen] = useState(false);
+  // Track previous completion state to detect transitions (prevents confetti on deselection)
+  const previousAllCompletedRef = useRef<boolean | null>(null);
 
   // Get time-based greeting
   const today = new Date();
@@ -53,8 +52,7 @@ export default function DashboardScreen() {
     const habitsForDate = getHabitsForDate(selectedDate);
     if (habitsForDate.length === 0) {
       setShowConfetti(false);
-      setShowShareWin(false);
-      wasAllCompletedRef.current = false;
+      previousAllCompletedRef.current = false;
       return; // No habits, no confetti
     }
     
@@ -65,28 +63,34 @@ export default function DashboardScreen() {
     selectedDateNormalized.setHours(0, 0, 0, 0);
     const isToday = selectedDateNormalized.getTime() === today.getTime();
     
-    // Only trigger if transitioning from not all completed to all completed
-    if (allCompleted && isToday && !wasAllCompletedRef.current) {
-      // Clear any existing timeouts
-      if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
-      if (shareWinTimeoutRef.current) clearTimeout(shareWinTimeoutRef.current);
-      
+    // Only check for today's habits
+    if (!isToday) {
+      setShowConfetti(false);
+      previousAllCompletedRef.current = false;
+      return;
+    }
+    
+    // Get previous state (null on first render to prevent confetti on initial load)
+    const previousAllCompleted = previousAllCompletedRef.current;
+    
+    // Trigger confetti only when transitioning from incomplete to all complete
+    // This prevents confetti from triggering when deselecting habits or on initial render
+    if (previousAllCompleted === false && allCompleted === true) {
       setShowConfetti(true);
-      wasAllCompletedRef.current = true;
-      
       // Hide confetti after animation completes, then show share screen
-      confettiTimeoutRef.current = setTimeout(() => {
+      setTimeout(() => {
         setShowConfetti(false);
-        // Double-check if all habits are still completed before showing share screen
-        const currentHabits = getHabitsForDate(selectedDate);
-        const stillAllCompleted = currentHabits.every(habit => habit.completed);
-        if (stillAllCompleted) {
-          shareWinTimeoutRef.current = setTimeout(() => {
-            setShowShareWin(true);
-          }, 500); // Small delay after confetti fades
+        
+        // Check if there's a streak worth celebrating
+        const streak = calculateLongestStreak();
+        
+      
+        if (streak > 0) {
+          setShowShareScreen(true);
         }
-      }, 3000); // Confetti duration
-    } else if (!allCompleted || !isToday) {
+      }, 3000);
+    } else {
+      // Don't show confetti for other state transitions (true→false, true→true, or initial render)
       setShowConfetti(false);
       setShowShareWin(false);
       wasAllCompletedRef.current = false;
@@ -94,6 +98,9 @@ export default function DashboardScreen() {
       if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
       if (shareWinTimeoutRef.current) clearTimeout(shareWinTimeoutRef.current);
     }
+    
+    // Update the ref with current state for next comparison
+    previousAllCompletedRef.current = allCompleted;
   };
 
   // Check when habits change
@@ -106,13 +113,10 @@ export default function DashboardScreen() {
     };
   }, [selectedDate, habits]);
 
-  // Reset confetti and share screen when date changes
+  // Reset confetti and previous state when date changes
   useEffect(() => {
     setShowConfetti(false);
-    setShowShareWin(false);
-    wasAllCompletedRef.current = false;
-    if (confettiTimeoutRef.current) clearTimeout(confettiTimeoutRef.current);
-    if (shareWinTimeoutRef.current) clearTimeout(shareWinTimeoutRef.current);
+    previousAllCompletedRef.current = null; // Reset to null so we don't trigger on date change
   }, [selectedDate]);
 
   // Handle habit toggle callback
@@ -184,8 +188,11 @@ export default function DashboardScreen() {
         />
       )}
 
-      {/* Share Win Screen */}
-      <ShareWinScreen visible={showShareWin} onClose={() => setShowShareWin(false)} />
+      {/* Share Streak Screen */}
+      <ShareStreakScreen
+        visible={showShareScreen}
+        onClose={() => setShowShareScreen(false)}
+      />
     </View>
   );
 }
