@@ -1,5 +1,6 @@
 import DailyHabitList from '@/components/DailyHabitList';
 import ReminderCard from '@/components/ReminderCard';
+import ShareStreakScreen from '@/components/ShareStreakScreen';
 import WeeklyCalendar from '@/components/WeeklyCalendar';
 import { useAuth } from '@/context/AuthContext';
 import { useHabits } from '@/context/HabitsContext';
@@ -15,8 +16,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function DashboardScreen() {
   const { colors, isDarkMode } = useTheme();
   const { userProfile } = useAuth();
-  const { setSelectedDate, getHabitsForDate, selectedDate, habits } = useHabits();
+  const { setSelectedDate, getHabitsForDate, selectedDate, habits, calculateLongestStreak } = useHabits();
   const [showConfetti, setShowConfetti] = useState(false);
+  const [showShareScreen, setShowShareScreen] = useState(false);
 
   // Get time-based greeting
   const today = new Date();
@@ -61,9 +63,21 @@ export default function DashboardScreen() {
     // Only trigger confetti for today and if all habits are completed
     if (allCompleted && isToday) {
       setShowConfetti(true);
-      // Hide confetti after animation completes
+      // Hide confetti after animation completes, then show share screen
       setTimeout(() => {
         setShowConfetti(false);
+        
+        // Check if there's a streak worth celebrating
+        const streak = calculateLongestStreak();
+        
+        // Show share screen on milestones (7, 14, 21, 30, 50, 100) or if streak >= 7
+        const milestones = [7, 14, 21, 30, 50, 100];
+        const isMilestone = milestones.includes(streak);
+        const isSignificantStreak = streak >= 7;
+        
+        if (streak > 1) {
+          setShowShareScreen(true);
+        }
       }, 3000);
     } else {
       setShowConfetti(false);
@@ -148,6 +162,12 @@ export default function DashboardScreen() {
           fallSpeed={3000}
         />
       )}
+
+      {/* Share Streak Screen */}
+      <ShareStreakScreen
+        visible={showShareScreen}
+        onClose={() => setShowShareScreen(false)}
+      />
     </View>
   );
 }
