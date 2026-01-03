@@ -8,7 +8,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +19,8 @@ export default function DashboardScreen() {
   const { setSelectedDate, getHabitsForDate, selectedDate, habits, calculateLongestStreak } = useHabits();
   const [showConfetti, setShowConfetti] = useState(false);
   const [showShareScreen, setShowShareScreen] = useState(false);
+  // Track previous completion state to detect transitions (prevents confetti on deselection)
+  const previousAllCompletedRef = useRef<boolean | null>(null);
 
   // Get time-based greeting
   const today = new Date();
@@ -50,6 +52,7 @@ export default function DashboardScreen() {
     const habitsForDate = getHabitsForDate(selectedDate);
     if (habitsForDate.length === 0) {
       setShowConfetti(false);
+      previousAllCompletedRef.current = false;
       return; // No habits, no confetti
     }
     
@@ -60,8 +63,19 @@ export default function DashboardScreen() {
     selectedDateNormalized.setHours(0, 0, 0, 0);
     const isToday = selectedDateNormalized.getTime() === today.getTime();
     
-    // Only trigger confetti for today and if all habits are completed
-    if (allCompleted && isToday) {
+    // Only check for today's habits
+    if (!isToday) {
+      setShowConfetti(false);
+      previousAllCompletedRef.current = false;
+      return;
+    }
+    
+    // Get previous state (null on first render to prevent confetti on initial load)
+    const previousAllCompleted = previousAllCompletedRef.current;
+    
+    // Trigger confetti only when transitioning from incomplete to all complete
+    // This prevents confetti from triggering when deselecting habits or on initial render
+    if (previousAllCompleted === false && allCompleted === true) {
       setShowConfetti(true);
       // Hide confetti after animation completes, then show share screen
       setTimeout(() => {
@@ -70,18 +84,18 @@ export default function DashboardScreen() {
         // Check if there's a streak worth celebrating
         const streak = calculateLongestStreak();
         
-        // Show share screen on milestones (7, 14, 21, 30, 50, 100) or if streak >= 7
-        const milestones = [7, 14, 21, 30, 50, 100];
-        const isMilestone = milestones.includes(streak);
-        const isSignificantStreak = streak >= 7;
-        
+      
         if (streak > 1) {
           setShowShareScreen(true);
         }
       }, 3000);
     } else {
+      // Don't show confetti for other state transitions (true→false, true→true, or initial render)
       setShowConfetti(false);
     }
+    
+    // Update the ref with current state for next comparison
+    previousAllCompletedRef.current = allCompleted;
   };
 
   // Check when habits change
@@ -89,9 +103,10 @@ export default function DashboardScreen() {
     checkAllHabitsCompleted();
   }, [selectedDate, habits]);
 
-  // Reset confetti when date changes
+  // Reset confetti and previous state when date changes
   useEffect(() => {
     setShowConfetti(false);
+    previousAllCompletedRef.current = null; // Reset to null so we don't trigger on date change
   }, [selectedDate]);
 
   // Handle habit toggle callback
