@@ -17,6 +17,12 @@ export default function TabLayout() {
   const navigationBorder = isDarkMode ? '#C6C6C8' : colors.border;
   const navigationText = isDarkMode ? '#1C1C1E' : colors.text;
   const tabInactiveTint = isDarkMode ? '#3C3C43' : colors.text;
+  
+  // Override icon colors to white in system dark mode for better visibility
+  // This ensures menu icons remain visible regardless of user theme settings
+  const isSystemDarkMode = colorScheme === 'dark';
+  const tabBarActiveColor = isSystemDarkMode ? '#FFFFFF' : colors.primary;
+  const tabBarInactiveColor = isSystemDarkMode ? 'rgba(255, 255, 255, 0.6)' : tabInactiveTint;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -42,8 +48,8 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: tabInactiveTint,
+        tabBarActiveTintColor: tabBarActiveColor,
+        tabBarInactiveTintColor: tabBarInactiveColor,
         headerStyle: {
           backgroundColor: navigationBackground,
         },
