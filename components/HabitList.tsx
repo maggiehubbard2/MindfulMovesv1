@@ -36,6 +36,7 @@ function HabitItem({
   onRemoveHabit,
   onUpdateHabit,
   isEditable,
+  useScaleDecorator = true,
 }: {
   habit: Habit;
   drag: () => void;
@@ -45,6 +46,7 @@ function HabitItem({
   onRemoveHabit: (id: string) => void;
   onUpdateHabit?: (id: string, name: string, description?: string) => void;
   isEditable?: boolean;
+  useScaleDecorator?: boolean;
 }) {
   const renderRightActions = () => {
     return (
@@ -63,61 +65,67 @@ function HabitItem({
     }
   };
 
+  const content = (
+    <TouchableOpacity
+      onLongPress={isEditable ? drag : undefined}
+      activeOpacity={0.7}
+      style={[
+        styles.habitItem,
+        { backgroundColor: colors.card },
+        isActive && styles.habitItemActive,
+      ]}
+    >
+      {/* Hamburger icon - visual indicator only, drag works via row long-press */}
+      {isEditable && (
+        <View style={styles.dragHandle}>
+          <Ionicons name="reorder-three-outline" size={24} color={colors.secondary} />
+        </View>
+      )}
+
+      <View style={styles.habitInfo}>
+        <View style={styles.habitDetails}>
+          <Text style={[styles.habitName, { color: colors.text }]}>{habit.name}</Text>
+          {habit.description && (
+            <Text style={[styles.descriptionText, { color: colors.secondary }]}>
+              {habit.description}
+            </Text>
+          )}
+        </View>
+      </View>
+
+      {/* Edit Button */}
+      {isEditable && onUpdateHabit && (
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={handleEdit}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="pencil-outline" size={20} color={colors.primary} />
+        </TouchableOpacity>
+      )}
+
+      {/* Checkbox */}
+      <TouchableOpacity
+        style={[
+          styles.checkbox,
+          habit.completed && { backgroundColor: colors.primary }
+        ]}
+        onPress={() => onToggleHabit(habit.id)}
+      >
+        {habit.completed && (
+          <Ionicons name="checkmark" size={20} color="white" />
+        )}
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+
   return (
     <Swipeable renderRightActions={renderRightActions} enabled={!isActive}>
-      <ScaleDecorator>
-        <TouchableOpacity
-          onLongPress={isEditable ? drag : undefined}
-          activeOpacity={0.7}
-          style={[
-            styles.habitItem,
-            { backgroundColor: colors.card },
-            isActive && styles.habitItemActive,
-          ]}
-        >
-          {/* Hamburger icon - visual indicator only, drag works via row long-press */}
-          {isEditable && (
-            <View style={styles.dragHandle}>
-              <Ionicons name="reorder-three-outline" size={24} color={colors.secondary} />
-            </View>
-          )}
-
-          <View style={styles.habitInfo}>
-            <View style={styles.habitDetails}>
-              <Text style={[styles.habitName, { color: colors.text }]}>{habit.name}</Text>
-              {habit.description && (
-                <Text style={[styles.descriptionText, { color: colors.secondary }]}>
-                  {habit.description}
-                </Text>
-              )}
-            </View>
-          </View>
-
-          {/* Edit Button */}
-          {isEditable && onUpdateHabit && (
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={handleEdit}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="pencil-outline" size={20} color={colors.primary} />
-            </TouchableOpacity>
-          )}
-
-          {/* Checkbox */}
-          <TouchableOpacity
-            style={[
-              styles.checkbox,
-              habit.completed && { backgroundColor: colors.primary }
-            ]}
-            onPress={() => onToggleHabit(habit.id)}
-          >
-            {habit.completed && (
-              <Ionicons name="checkmark" size={20} color="white" />
-            )}
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </ScaleDecorator>
+      {useScaleDecorator ? (
+        <ScaleDecorator>{content}</ScaleDecorator>
+      ) : (
+        content
+      )}
     </Swipeable>
   );
 }
@@ -220,6 +228,7 @@ export default function HabitList({
                   onRemoveHabit={onRemoveHabit}
                   onUpdateHabit={onUpdateHabit}
                   isEditable={isEditable}
+                  useScaleDecorator={false}
                 />
               ))}
             </View>
