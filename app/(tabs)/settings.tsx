@@ -1,13 +1,13 @@
+import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-import { supabase } from '@/config/supabase';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -360,13 +360,14 @@ export default function SettingsScreen() {
 
   const confirmLogout = async () => {
     try {
+      setShowLogoutModal(false); // Close modal first for better UX
       await logout();
-      setShowLogoutModal(false);
-      setTimeout(() => {
-        router.replace('/login');
-      }, 100);
+      // Don't navigate manually - let index.tsx handle it based on user state
+      // This avoids race conditions and ensures auth state has propagated
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to logout');
+      // Reopen modal if logout failed
+      setShowLogoutModal(true);
     }
   };
 
