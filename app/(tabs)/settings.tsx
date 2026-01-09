@@ -631,95 +631,100 @@ export default function SettingsScreen() {
         animationType="fade"
         onRequestClose={() => setShowColorPicker(false)}
       >
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        >
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
+        <View style={styles.modalOverlay} pointerEvents="box-none">
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setShowColorPicker(false)}
+            style={StyleSheet.absoluteFill}
+          />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'position' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? -100 : 20}
+            style={{ width: '100%', alignItems: 'center' }}
+            pointerEvents="box-none"
           >
-            <View style={[styles.colorPickerContent, { backgroundColor: colors.card }]}>
-              <Ionicons name="color-palette-outline" size={40} color={colors.primary} style={styles.modalIcon} />
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Choose Accent Color</Text>
-              <Text style={[styles.modalMessage, { color: colors.secondary }]}>
-                Tap a color below or enter a custom HEX value.
-              </Text>
+            <View 
+              style={[styles.colorPickerContent, { backgroundColor: colors.card }]}
+            >
+                <Ionicons name="color-palette-outline" size={40} color={colors.primary} style={styles.modalIcon} />
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Choose Accent Color</Text>
+                <Text style={[styles.modalMessage, { color: colors.secondary }]}>
+                  Tap a color below or enter a custom HEX value.
+                </Text>
 
-              <View style={styles.presetGrid}>
-                {presetPalette.map((paletteColor) => {
-                  const normalized = normalizeHex(paletteColor);
-                  const isSelected = tempCustomColor === normalized;
-                  return (
-                    <TouchableOpacity
-                      key={normalized}
-                      style={[
-                        styles.presetSwatch,
-                        { backgroundColor: normalized },
-                        isSelected && styles.selectedPreset,
-                      ]}
-                      onPress={() => handleSelectPreset(normalized)}
-                    >
-                      {isSelected && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                <View style={styles.presetGrid}>
+                  {presetPalette.map((paletteColor) => {
+                    const normalized = normalizeHex(paletteColor);
+                    const isSelected = tempCustomColor === normalized;
+                    return (
+                      <TouchableOpacity
+                        key={normalized}
+                        style={[
+                          styles.presetSwatch,
+                          { backgroundColor: normalized },
+                          isSelected && styles.selectedPreset,
+                        ]}
+                        onPress={() => handleSelectPreset(normalized)}
+                      >
+                        {isSelected && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
 
-              <View style={[styles.hexInputContainer, { borderColor: colors.border }]}>
-                <Text style={[styles.hexLabel, { color: colors.secondary }]}>HEX</Text>
-                <TextInput
-                  value={hexInput}
-                  onChangeText={(text) => {
-                    const formatted = text.startsWith('#') ? text.toUpperCase() : `#${text.toUpperCase()}`;
-                    setHexInput(formatted);
-                    if (/^#([0-9A-F]{3})$/i.test(formatted) || /^#([0-9A-F]{6})$/i.test(formatted)) {
-                      setTempCustomColor(normalizeHex(formatted));
-                    }
-                  }}
-                  style={[styles.hexInput, { color: colors.text }]}
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  maxLength={7}
-                  placeholder="#FF6B6B"
-                  placeholderTextColor={colors.secondary}
-                />
-                <View style={[styles.hexPreview, { backgroundColor: tempCustomColor }]} />
-              </View>
-              {!isValidHex && (
-                <Text style={styles.validationText}>Enter a valid 6-digit HEX code (e.g., #FF6B6B).</Text>
-              )}
+                <View style={[styles.hexInputContainer, { borderColor: colors.border }]}>
+                  <Text style={[styles.hexLabel, { color: colors.secondary }]}>HEX</Text>
+                  <TextInput
+                    value={hexInput}
+                    onChangeText={(text) => {
+                      const formatted = text.startsWith('#') ? text.toUpperCase() : `#${text.toUpperCase()}`;
+                      setHexInput(formatted);
+                      if (/^#([0-9A-F]{3})$/i.test(formatted) || /^#([0-9A-F]{6})$/i.test(formatted)) {
+                        setTempCustomColor(normalizeHex(formatted));
+                      }
+                    }}
+                    style={[styles.hexInput, { color: colors.text }]}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    maxLength={7}
+                    placeholder="#FF6B6B"
+                    placeholderTextColor={colors.secondary}
+                  />
+                  <View style={[styles.hexPreview, { backgroundColor: tempCustomColor }]} />
+                </View>
+                {!isValidHex && (
+                  <Text style={styles.validationText}>Enter a valid 6-digit HEX code (e.g., #FF6B6B).</Text>
+                )}
 
-              <View style={styles.modalButtonContainer}>
-                <TouchableOpacity
-                  style={[styles.modalButton, { backgroundColor: colors.border }]}
-                  onPress={() => setShowColorPicker(false)}
-                >
-                  <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.modalButton,
-                    {
-                      backgroundColor: tempCustomColor,
-                      opacity: isValidHex ? 1 : 0.5,
-                    },
-                  ]}
-                  onPress={() => {
-                    if (isValidHex) {
-                      setAccentColor('custom', tempCustomColor);
-                      setShowColorPicker(false);
-                    }
-                  }}
-                  disabled={!isValidHex}
-                >
-                  <Text style={styles.modalButtonText}>Use Color</Text>
-                </TouchableOpacity>
+                <View style={styles.modalButtonContainer}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, { backgroundColor: colors.border }]}
+                    onPress={() => setShowColorPicker(false)}
+                  >
+                    <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.modalButton,
+                      {
+                        backgroundColor: tempCustomColor,
+                        opacity: isValidHex ? 1 : 0.5,
+                      },
+                    ]}
+                    onPress={() => {
+                      if (isValidHex) {
+                        setAccentColor('custom', tempCustomColor);
+                        setShowColorPicker(false);
+                      }
+                    }}
+                    disabled={!isValidHex}
+                  >
+                    <Text style={styles.modalButtonText}>Use Color</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       <Modal
@@ -885,6 +890,7 @@ const styles = StyleSheet.create({
     padding: 24,
     width: '100%',
     maxWidth: 420,
+    maxHeight: '90%',
     alignItems: 'center',
     gap: 16,
     shadowColor: '#000',
@@ -947,11 +953,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   modalContent: {
     borderRadius: 16,
