@@ -27,6 +27,7 @@ interface HabitsContextType {
   canEditDate: (date: Date) => boolean;
   resetHabitsForNewDay: () => Promise<void>;
   calculateLongestStreak: () => number;
+  refresh: () => Promise<void>; // Refresh habits from Supabase
 }
 
 const HabitsContext = createContext<HabitsContextType | undefined>(undefined);
@@ -198,7 +199,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loadHabitsFromSupabase = async () => {
+  const loadHabitsFromSupabase = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -252,7 +253,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         console.error('Error loading habits from Supabase:', error);
       }
     }
-  };
+  }, [user]);
 
   // Cache today's date string to avoid repeated calculations
   const getTodayDateString = ((): (() => string) => {
@@ -545,6 +546,14 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   // Calculate longest streak - memoized to avoid recalculating on every render
   const longestStreak = React.useMemo(() => calculateLongestStreak(habits), [habits]);
 
+  // Refresh method for soft refresh system
+  // Safe to call multiple times - idempotent
+  const refresh = useCallback(async () => {
+    if (user) {
+      await loadHabitsFromSupabase();
+    }
+  }, [user, loadHabitsFromSupabase]);
+
   return (
     <HabitsContext.Provider value={{ 
       habits, 
@@ -559,6 +568,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       canEditDate,
       resetHabitsForNewDay,
       calculateLongestStreak: () => longestStreak,
+      refresh,
     }}>
       {children}
     </HabitsContext.Provider>
