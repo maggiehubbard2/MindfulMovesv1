@@ -3,7 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-interface Habit {
+export interface Habit {
   id: string;
   name: string;
   description?: string;

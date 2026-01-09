@@ -38,6 +38,7 @@ export function getHabitCompletionForDate(habits: Habit[], date: Date): number {
  * Get the current month's completion statistics based on habits
  * Uses historical completion data from completionDates array
  * Only includes habits that existed on each respective date
+ * Only counts days up to today (excludes future dates)
  */
 export function getHabitMonthStats(habits: Habit[], year: number, month: number): {
   averageCompletion: number;
@@ -63,9 +64,30 @@ export function getHabitMonthStats(habits: Habit[], year: number, month: number)
     monthDates.push(new Date(year, month - 1, day));
   }
   
-  // Calculate completion percentage for each day
+  // Get today's date (normalized to start of day for comparison)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Filter out future dates - only include days up to today
+  const datesUpToToday = monthDates.filter(date => {
+    const dateNormalized = new Date(date);
+    dateNormalized.setHours(0, 0, 0, 0);
+    return dateNormalized <= today;
+  });
+  
+  // If no dates up to today (viewing future month), return zeros
+  if (datesUpToToday.length === 0) {
+    return {
+      averageCompletion: 0,
+      bestDay: 0,
+      totalHabits: habits.length,
+      daysWithData: 0,
+    };
+  }
+  
+  // Calculate completion percentage for each day up to today
   // Each day will only count habits that existed on that date
-  const dailyPercentages = monthDates.map(date => 
+  const dailyPercentages = datesUpToToday.map(date => 
     getHabitCompletionForDate(habits, date)
   );
   
