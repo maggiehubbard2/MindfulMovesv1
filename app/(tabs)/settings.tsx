@@ -1,15 +1,15 @@
+import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-import { supabase } from '@/config/supabase';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const presetPalette = [
@@ -360,13 +360,14 @@ export default function SettingsScreen() {
 
   const confirmLogout = async () => {
     try {
+      setShowLogoutModal(false); // Close modal first for better UX
       await logout();
-      setShowLogoutModal(false);
-      setTimeout(() => {
-        router.replace('/login');
-      }, 100);
+      // Don't navigate manually - let index.tsx handle it based on user state
+      // This avoids race conditions and ensures auth state has propagated
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to logout');
+      // Reopen modal if logout failed
+      setShowLogoutModal(true);
     }
   };
 
@@ -623,95 +624,107 @@ export default function SettingsScreen() {
         </View>
       </ScrollView>
 
-      {/* Logout Confirmation Modal */}
+      {/* HEX Code Color Picker Modal */}
       <Modal
         visible={showColorPicker}
         transparent={true}
         animationType="fade"
         onRequestClose={() => setShowColorPicker(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.colorPickerContent, { backgroundColor: colors.card }]}>
-            <Ionicons name="color-palette-outline" size={40} color={colors.primary} style={styles.modalIcon} />
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Choose Accent Color</Text>
-            <Text style={[styles.modalMessage, { color: colors.secondary }]}>
-              Tap a color below or enter a custom HEX value.
-            </Text>
+        <View style={styles.modalOverlay} pointerEvents="box-none">
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setShowColorPicker(false)}
+            style={StyleSheet.absoluteFill}
+          />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'position' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? -100 : 20}
+            style={{ width: '100%', alignItems: 'center' }}
+            pointerEvents="box-none"
+          >
+            <View style={[styles.colorPickerContent, { backgroundColor: colors.card }]}>
+              <Ionicons name="color-palette-outline" size={40} color={colors.primary} style={styles.modalIcon} />
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Choose Accent Color</Text>
+              <Text style={[styles.modalMessage, { color: colors.secondary }]}>
+                Tap a color below or enter a custom HEX value.
+              </Text>
 
-            <View style={styles.presetGrid}>
-              {presetPalette.map((paletteColor) => {
-                const normalized = normalizeHex(paletteColor);
-                const isSelected = tempCustomColor === normalized;
-                return (
-                  <TouchableOpacity
-                    key={normalized}
-                    style={[
-                      styles.presetSwatch,
-                      { backgroundColor: normalized },
-                      isSelected && styles.selectedPreset,
-                    ]}
-                    onPress={() => handleSelectPreset(normalized)}
-                  >
-                    {isSelected && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+              <View style={styles.presetGrid}>
+                {presetPalette.map((paletteColor) => {
+                  const normalized = normalizeHex(paletteColor);
+                  const isSelected = tempCustomColor === normalized;
+                  return (
+                    <TouchableOpacity
+                      key={normalized}
+                      style={[
+                        styles.presetSwatch,
+                        { backgroundColor: normalized },
+                        isSelected && styles.selectedPreset,
+                      ]}
+                      onPress={() => handleSelectPreset(normalized)}
+                    >
+                      {isSelected && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-            <View style={[styles.hexInputContainer, { borderColor: colors.border }]}>
-              <Text style={[styles.hexLabel, { color: colors.secondary }]}>HEX</Text>
-              <TextInput
-                value={hexInput}
-                onChangeText={(text) => {
-                  const formatted = text.startsWith('#') ? text.toUpperCase() : `#${text.toUpperCase()}`;
-                  setHexInput(formatted);
-                  if (/^#([0-9A-F]{3})$/i.test(formatted) || /^#([0-9A-F]{6})$/i.test(formatted)) {
-                    setTempCustomColor(normalizeHex(formatted));
-                  }
-                }}
-                style={[styles.hexInput, { color: colors.text }]}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                maxLength={7}
-                placeholder="#FF6B6B"
-                placeholderTextColor={colors.secondary}
-              />
-              <View style={[styles.hexPreview, { backgroundColor: tempCustomColor }]} />
-            </View>
-            {!isValidHex && (
-              <Text style={styles.validationText}>Enter a valid 6-digit HEX code (e.g., #FF6B6B).</Text>
-            )}
+              <View style={[styles.hexInputContainer, { borderColor: colors.border }]}>
+                <Text style={[styles.hexLabel, { color: colors.secondary }]}>HEX</Text>
+                <TextInput
+                  value={hexInput}
+                  onChangeText={(text) => {
+                    const formatted = text.startsWith('#') ? text.toUpperCase() : `#${text.toUpperCase()}`;
+                    setHexInput(formatted);
+                    if (/^#([0-9A-F]{3})$/i.test(formatted) || /^#([0-9A-F]{6})$/i.test(formatted)) {
+                      setTempCustomColor(normalizeHex(formatted));
+                    }
+                  }}
+                  style={[styles.hexInput, { color: colors.text }]}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={7}
+                  placeholder="#FF6B6B"
+                  placeholderTextColor={colors.secondary}
+                />
+                <View style={[styles.hexPreview, { backgroundColor: tempCustomColor }]} />
+              </View>
+              {!isValidHex && (
+                <Text style={styles.validationText}>Enter a valid 6-digit HEX code (e.g., #FF6B6B).</Text>
+              )}
 
-            <View style={styles.modalButtonContainer}>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: colors.border }]}
-                onPress={() => setShowColorPicker(false)}
-              >
-                <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modalButton,
-                  {
-                    backgroundColor: tempCustomColor,
-                    opacity: isValidHex ? 1 : 0.5,
-                  },
-                ]}
-                onPress={() => {
-                  if (isValidHex) {
-                    setAccentColor('custom', tempCustomColor);
-                    setShowColorPicker(false);
-                  }
-                }}
-                disabled={!isValidHex}
-              >
-                <Text style={styles.modalButtonText}>Use Color</Text>
-              </TouchableOpacity>
+              <View style={styles.modalButtonContainer}>
+                <TouchableOpacity
+                  style={[styles.modalButton, { backgroundColor: colors.border }]}
+                  onPress={() => setShowColorPicker(false)}
+                >
+                  <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton,
+                    {
+                      backgroundColor: tempCustomColor,
+                      opacity: isValidHex ? 1 : 0.5,
+                    },
+                  ]}
+                  onPress={() => {
+                    if (isValidHex) {
+                      setAccentColor('custom', tempCustomColor);
+                      setShowColorPicker(false);
+                    }
+                  }}
+                  disabled={!isValidHex}
+                >
+                  <Text style={styles.modalButtonText}>Use Color</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
-
+{/* Logout Confirmation Modal */}
       <Modal
         visible={showLogoutModal}
         transparent={true}
@@ -875,6 +888,7 @@ const styles = StyleSheet.create({
     padding: 24,
     width: '100%',
     maxWidth: 420,
+    maxHeight: '90%',
     alignItems: 'center',
     gap: 16,
     shadowColor: '#000',

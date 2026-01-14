@@ -2,10 +2,14 @@ import '@/config/supabase'; // Initialize Supabase
 import { AuthProvider } from '@/context/AuthContext';
 import { HabitsProvider } from '@/context/HabitsContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
+import { useAppRefresh } from '@/hooks/useAppRefresh';
 import { Stack } from 'expo-router';
 
 function RootLayoutNav() {
   const { colors } = useTheme();
+  
+  // Enable app refresh on foreground transitions
+  useAppRefresh();
   
   return (
     <Stack screenOptions={{ headerShown: false }}>

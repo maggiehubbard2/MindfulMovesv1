@@ -1,9 +1,10 @@
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { writeWidgetData } from '@/utils/widgetData';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-interface Habit {
+export interface Habit {
   id: string;
   name: string;
   description?: string;
@@ -27,6 +28,7 @@ interface HabitsContextType {
   canEditDate: (date: Date) => boolean;
   resetHabitsForNewDay: () => Promise<void>;
   calculateLongestStreak: () => number;
+  refresh: () => Promise<void>; // Refresh habits from Supabase
 }
 
 const HabitsContext = createContext<HabitsContextType | undefined>(undefined);
@@ -120,6 +122,24 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const { user } = useAuth();
 
+  // Write widget data whenever habits change
+  useEffect(() => {
+    if (user && habits.length > 0) {
+      // Defer widget write to not block UI
+      const writeWidget = () => {
+        writeWidgetData(habits).catch(() => {
+          // Silent fail for widget writes
+        });
+      };
+      
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(writeWidget);
+      } else {
+        setTimeout(writeWidget, 0);
+      }
+    }
+  }, [habits, user]);
+
   // Load habits from Supabase when user is authenticated
   useEffect(() => {
     if (user) {
@@ -198,7 +218,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loadHabitsFromSupabase = async () => {
+  const loadHabitsFromSupabase = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -252,7 +272,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         console.error('Error loading habits from Supabase:', error);
       }
     }
-  };
+  }, [user]);
 
   // Cache today's date string to avoid repeated calculations
   const getTodayDateString = ((): (() => string) => {
@@ -545,6 +565,14 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   // Calculate longest streak - memoized to avoid recalculating on every render
   const longestStreak = React.useMemo(() => calculateLongestStreak(habits), [habits]);
 
+  // Refresh method for soft refresh system
+  // Safe to call multiple times - idempotent
+  const refresh = useCallback(async () => {
+    if (user) {
+      await loadHabitsFromSupabase();
+    }
+  }, [user, loadHabitsFromSupabase]);
+
   return (
     <HabitsContext.Provider value={{ 
       habits, 
@@ -559,6 +587,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       canEditDate,
       resetHabitsForNewDay,
       calculateLongestStreak: () => longestStreak,
+      refresh,
     }}>
       {children}
     </HabitsContext.Provider>

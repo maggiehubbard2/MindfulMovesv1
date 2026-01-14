@@ -1,4 +1,5 @@
 import { supabase } from '@/config/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '@supabase/supabase-js';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
@@ -217,8 +218,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
+      // Clear AsyncStorage data (user-specific cache)
+      await AsyncStorage.multiRemove([
+        'habits',
+        'tasks',
+        'lastHabitResetDate',
+        'lastTaskCheck',
+        // Note: Don't clear theme preferences - users might want to keep those
+      ]);
+      
+      // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      
+      // Explicitly clear local state immediately
+      setUser(null);
+      setUserProfile(null);
     } catch (error) {
       throw error;
     }
