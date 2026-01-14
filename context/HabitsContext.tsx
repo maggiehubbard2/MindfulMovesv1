@@ -1,5 +1,6 @@
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { writeWidgetData } from '@/utils/widgetData';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
@@ -120,6 +121,24 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const { user } = useAuth();
+
+  // Write widget data whenever habits change
+  useEffect(() => {
+    if (user && habits.length > 0) {
+      // Defer widget write to not block UI
+      const writeWidget = () => {
+        writeWidgetData(habits).catch(() => {
+          // Silent fail for widget writes
+        });
+      };
+      
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(writeWidget);
+      } else {
+        setTimeout(writeWidget, 0);
+      }
+    }
+  }, [habits, user]);
 
   // Load habits from Supabase when user is authenticated
   useEffect(() => {
