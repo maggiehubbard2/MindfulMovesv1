@@ -9,16 +9,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function DashboardScreen() {
   const { colors, isDarkMode } = useTheme();
-  const { userProfile } = useAuth();
-  const { setSelectedDate, getHabitsForDate, selectedDate, habits, calculateLongestStreak } = useHabits();
+  const { userProfile, refreshUserProfile } = useAuth();
+  const { setSelectedDate, getHabitsForDate, selectedDate, habits, calculateLongestStreak, refresh } = useHabits();
   const [showConfetti, setShowConfetti] = useState(false);
   const [showShareScreen, setShowShareScreen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   // Track previous completion state to detect transitions (prevents confetti on deselection)
   const previousAllCompletedRef = useRef<boolean | null>(null);
 
@@ -117,6 +118,25 @@ export default function DashboardScreen() {
     }, 100);
   };
 
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Refresh both habits and user profile data
+      await Promise.all([
+        refresh(),
+        refreshUserProfile(),
+      ]);
+    } catch (error) {
+      // Silent fail - don't disrupt UX
+      if (__DEV__) {
+        console.error('Error refreshing dashboard:', error);
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -126,6 +146,14 @@ export default function DashboardScreen() {
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
         >
           {/* Header with Greeting and Profile */}
           <View style={styles.topHeader}>
