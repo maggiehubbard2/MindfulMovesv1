@@ -60,14 +60,23 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [customAccentColor, setCustomAccentColor] = useState<string>('#FF6B6B');
 
   useEffect(() => {
+    console.log('[COLD_START] ThemeProvider mounting...');
     loadThemePreference();
+    return () => {
+      console.log('[COLD_START] ThemeProvider unmounting');
+    };
   }, []);
 
   const loadThemePreference = async () => {
     try {
+      console.log('[COLD_START] ThemeContext: Loading preferences from AsyncStorage...');
+      const startTime = Date.now();
       const darkModeValue = await AsyncStorage.getItem('darkMode');
       const accentColorValue = await AsyncStorage.getItem('accentColor');
       const customAccentColorValue = await AsyncStorage.getItem('customAccentColor');
+      const duration = Date.now() - startTime;
+      console.log(`[COLD_START] ThemeContext: Preferences loaded in ${duration}ms`);
+      
       if (darkModeValue !== null) {
         setIsDarkMode(JSON.parse(darkModeValue));
       }
@@ -78,7 +87,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setCustomAccentColor(customAccentColorValue);
       }
     } catch (error) {
-      console.error('Error loading theme preference:', error);
+      console.error('[COLD_START] Error loading theme preference:', error);
     }
   };
 
