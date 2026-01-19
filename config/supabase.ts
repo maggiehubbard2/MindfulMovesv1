@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { createClient } from '@supabase/supabase-js';
 
 // Get Supabase credentials from environment variables
@@ -21,28 +21,32 @@ if (!supabaseUrl || !supabaseAnonKey || supabaseUrl === 'YOUR_SUPABASE_URL' || s
   );
 }
 
-// Create a storage adapter for AsyncStorage to persist Supabase sessions
-const AsyncStorageAdapter = {
+// Create a secure storage adapter using expo-secure-store
+// This stores auth tokens in the device keychain (iOS) or EncryptedSharedPreferences (Android)
+const SecureStoreAdapter = {
   getItem: async (key: string): Promise<string | null> => {
     try {
-      return await AsyncStorage.getItem(key);
+      return await SecureStore.getItemAsync(key);
     } catch (error) {
-      console.error('Error getting item from AsyncStorage:', error);
+      console.error('Error getting item from SecureStore:', error);
       return null;
     }
   },
   setItem: async (key: string, value: string): Promise<void> => {
     try {
-      await AsyncStorage.setItem(key, value);
+      await SecureStore.setItemAsync(key, value, {
+        requireAuthentication: false, // Don't require biometric auth for automatic token refresh
+        keychainAccessible: SecureStore.WHEN_UNLOCKED, // Accessible when device is unlocked
+      });
     } catch (error) {
-      console.error('Error setting item in AsyncStorage:', error);
+      console.error('Error setting item in SecureStore:', error);
     }
   },
   removeItem: async (key: string): Promise<void> => {
     try {
-      await AsyncStorage.removeItem(key);
+      await SecureStore.deleteItemAsync(key);
     } catch (error) {
-      console.error('Error removing item from AsyncStorage:', error);
+      console.error('Error removing item from SecureStore:', error);
     }
   },
 };
@@ -55,12 +59,12 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     // Enable automatic session refresh
     autoRefreshToken: true,
-    // Persist sessions using AsyncStorage
+    // Persist sessions using secure storage (device keychain)
     persistSession: true,
     // Detect session from URL (for deep links)
     detectSessionInUrl: true,
-    // Use AsyncStorage adapter for session persistence
-    storage: AsyncStorageAdapter,
+    // Use SecureStore adapter for secure session persistence
+    storage: SecureStoreAdapter,
     // Storage key for session persistence
     storageKey: 'supabase.auth.token',
   },
