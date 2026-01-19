@@ -8,6 +8,7 @@ interface UserProfile {
   email: string;
   name: string;
   firstName: string;
+  dateOfBirth?: string; // ISO date string (YYYY-MM-DD)
   created_at: string;
 }
 
@@ -16,7 +17,7 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, firstName: string) => Promise<void>;
+  signUp: (email: string, password: string, firstName: string, dateOfBirth?: Date) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   refreshUserProfile: () => Promise<void>;
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: data.email,
           name: data.name,
           firstName: data.first_name,
+          dateOfBirth: data.date_of_birth || undefined,
           created_at: data.created_at,
         });
       }
@@ -190,7 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, firstName: string) => {
+  const signUp = async (email: string, password: string, firstName: string, dateOfBirth?: Date) => {
     try {
       // Validate inputs
       if (password.length < 6) {
@@ -201,6 +203,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Please enter a valid email address');
       }
       
+      // Format date of birth as ISO string (YYYY-MM-DD) if provided
+      const dobString = dateOfBirth ? dateOfBirth.toISOString().split('T')[0] : null;
+      
       // Sign up user with metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -209,6 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           data: {
             name: firstName,
             first_name: firstName,
+            date_of_birth: dobString,
           },
         },
       });
@@ -227,6 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           user_email: email,
           user_name: firstName,
           user_first_name: firstName,
+          user_date_of_birth: dobString || null,
         });
         
         if (profileError) {
@@ -252,6 +259,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: authData.user.email || email,
           name: firstName,
           firstName: firstName,
+          dateOfBirth: dobString || undefined,
           created_at: new Date().toISOString(),
         });
       }

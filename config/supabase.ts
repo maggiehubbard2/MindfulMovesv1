@@ -47,6 +47,10 @@ const AsyncStorageAdapter = {
   },
 };
 
+// Log initialization for cold start debugging
+console.log('[COLD_START] Supabase client initializing...');
+const initStartTime = Date.now();
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     // Enable automatic session refresh
@@ -66,3 +70,5 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+const initDuration = Date.now() - initStartTime;
+console.log(`[COLD_START] Supabase client initialized in ${initDuration}ms`);
