@@ -152,6 +152,7 @@ export default function LoginScreen() {
       let errorMessage = 'Authentication failed';
       if (error?.message?.includes('already registered') || error?.message?.includes('User already registered')) {
         setShowEmailExistsModal(true);
+        setLoading(false); // Ensure loading is cleared on early return
         return; // Exit early since we handled this specific error
       } else if (error?.message?.includes('Invalid email') || error?.message?.includes('invalid email')) {
         errorMessage = 'Invalid email address';
@@ -458,7 +459,7 @@ export default function LoginScreen() {
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={[styles.footerText, { color: colors.secondary }]}>
-              Track your tasks, build better routines
+              Build habits. Stay consistent.
             </Text>
           </View>
         </View>

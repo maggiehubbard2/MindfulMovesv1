@@ -184,8 +184,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
       
-      if (data.user) {
-        await fetchUserProfile(data.user.id);
+      // Explicitly set user state immediately after successful login
+      // This ensures user state is available before navigation happens
+      if (data.user && data.session) {
+        setUser(data.user);
+        
+        // Fetch profile in background - don't block login completion
+        // If it fails or hangs, login should still succeed
+        // onAuthStateChange will also fire and fetch the profile,
+        // ensuring it eventually gets loaded even if this call fails
+        fetchUserProfile(data.user.id).catch((error) => {
+          // Log but don't block - profile will be fetched by onAuthStateChange
+          if (__DEV__) {
+            console.error('Error fetching profile during login (non-blocking):', error);
+          }
+        });
       }
     } catch (error: any) {
       throw error;
