@@ -8,15 +8,26 @@ export default function Index() {
   const segments = useSegments();
 
   useEffect(() => {
+    console.log('[COLD_START] Index route mounted');
+    return () => {
+      console.log('[COLD_START] Index route unmounting');
+    };
+  }, []);
+
+  useEffect(() => {
     if (loading) {
+      console.log('[COLD_START] Index: Waiting for auth to load...');
       return;
     }
 
+    console.log(`[COLD_START] Index: Auth loaded (user: ${!!user}), routing...`);
     if (user) {
       // User is authenticated, redirect to dashboard
+      console.log('[COLD_START] Index: Routing to dashboard');
       router.replace('/(tabs)/dashboard');
     } else {
       // User is not authenticated, redirect to login
+      console.log('[COLD_START] Index: Routing to login');
       router.replace('/login');
     }
   }, [user, loading]);

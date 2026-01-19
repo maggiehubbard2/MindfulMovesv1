@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { getRandomQuote } from '@/utils/quoteUtils';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -14,6 +15,8 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showEmailExistsModal, setShowEmailExistsModal] = useState(false);
@@ -23,7 +26,8 @@ export default function LoginScreen() {
   const [errors, setErrors] = useState({
     email: '',
     password: '',
-    firstName: ''
+    firstName: '',
+    dateOfBirth: ''
   });
   const loadingQuote = useMemo(() => getRandomQuote(), []);
 
@@ -31,7 +35,8 @@ export default function LoginScreen() {
     const newErrors = {
       email: '',
       password: '',
-      firstName: ''
+      firstName: '',
+      dateOfBirth: ''
     };
     let isValid = true;
 
@@ -61,6 +66,23 @@ export default function LoginScreen() {
       } else if (firstName.trim().length < 2) {
         newErrors.firstName = 'First name must be at least 2 characters';
         isValid = false;
+      }
+
+      // Date of birth validation
+      if (!dateOfBirth) {
+        newErrors.dateOfBirth = 'Date of birth is required';
+        isValid = false;
+      } else {
+        // Check if date is in the future
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const selectedDate = new Date(dateOfBirth);
+        selectedDate.setHours(0, 0, 0, 0);
+        
+        if (selectedDate > today) {
+          newErrors.dateOfBirth = 'Date of birth cannot be in the future';
+          isValid = false;
+        }
       }
     }
 
@@ -111,7 +133,12 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       if (isSignUp) {
-        await signUp(email, password, firstName);
+        if (!dateOfBirth) {
+          Alert.alert('Error', 'Please select your date of birth');
+          setLoading(false);
+          return;
+        }
+        await signUp(email, password, firstName, dateOfBirth);
         Alert.alert('Success', 'Account created successfully!');
         console.log('[Login] Sign up successful, routing to /(tabs)/dashboard');
         router.replace('/(tabs)/dashboard');
@@ -178,33 +205,135 @@ export default function LoginScreen() {
           {/* Form */}
           <View style={styles.form}>
             {isSignUp && (
-              <View>
-                <View style={styles.inputContainer}>
-                  <Ionicons name="person-outline" size={20} color={colors.secondary} style={styles.inputIcon} />
-                  <TextInput
-                    style={[
-                      styles.input, 
-                      { 
-                        backgroundColor: colors.card,
-                        color: colors.text,
-                        borderColor: errors.firstName ? '#FF3B30' : colors.border,
-                      }
-                    ]}
-                    placeholder="First Name"
-                    placeholderTextColor={colors.secondary}
-                    value={firstName}
-                    onChangeText={(text) => {
-                      setFirstName(text);
-                      if (errors.firstName) setErrors({...errors, firstName: ''});
-                    }}
-                    autoCapitalize="words"
-                    autoCorrect={false}
-                  />
+              <>
+                <View>
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="person-outline" size={20} color={colors.secondary} style={styles.inputIcon} />
+                    <TextInput
+                      style={[
+                        styles.input, 
+                        { 
+                          backgroundColor: colors.card,
+                          color: colors.text,
+                          borderColor: errors.firstName ? '#FF3B30' : colors.border,
+                        }
+                      ]}
+                      placeholder="First Name"
+                      placeholderTextColor={colors.secondary}
+                      value={firstName}
+                      onChangeText={(text) => {
+                        setFirstName(text);
+                        if (errors.firstName) setErrors({...errors, firstName: ''});
+                      }}
+                      autoCapitalize="words"
+                      autoCorrect={false}
+                    />
+                  </View>
+                  {errors.firstName ? (
+                    <Text style={styles.errorText}>{errors.firstName}</Text>
+                  ) : null}
                 </View>
-                {errors.firstName ? (
-                  <Text style={styles.errorText}>{errors.firstName}</Text>
-                ) : null}
-              </View>
+
+                {/* Date of Birth Picker */}
+                <View style={{ marginTop: 12 }}>
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="calendar-outline" size={20} color={colors.secondary} style={styles.inputIcon} />
+                    <TouchableOpacity
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: colors.card,
+                          borderColor: errors.dateOfBirth ? '#FF3B30' : colors.border,
+                          justifyContent: 'center',
+                        }
+                      ]}
+                      onPress={() => setShowDatePicker(true)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[
+                        { 
+                          color: dateOfBirth ? colors.text : colors.secondary,
+                          fontSize: 16,
+                        }
+                      ]}>
+                        {dateOfBirth 
+                          ? dateOfBirth.toLocaleDateString('en-US', { 
+                              year: 'numeric', 
+                              month: 'long', 
+                              day: 'numeric' 
+                            })
+                          : 'Date of Birth'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  {errors.dateOfBirth ? (
+                    <Text style={styles.errorText}>{errors.dateOfBirth}</Text>
+                  ) : null}
+                
+                {/* Date Picker - iOS shows in modal, Android shows native picker */}
+                {showDatePicker && (
+                  Platform.OS === 'ios' ? (
+                    <Modal
+                      visible={showDatePicker}
+                      transparent={true}
+                      animationType="slide"
+                      onRequestClose={() => setShowDatePicker(false)}
+                    >
+                      <View style={styles.datePickerModalOverlay}>
+                        <View style={[styles.datePickerModalContent, { backgroundColor: colors.card }]}>
+                          <View style={styles.datePickerHeader}>
+                            <TouchableOpacity
+                              onPress={() => {
+                                setShowDatePicker(false);
+                                if (errors.dateOfBirth) {
+                                  setErrors({...errors, dateOfBirth: ''});
+                                }
+                              }}
+                              style={styles.datePickerCloseButton}
+                            >
+                              <Text style={[styles.datePickerCloseButtonText, { color: colors.primary }]}>Done</Text>
+                            </TouchableOpacity>
+                          </View>
+                          <DateTimePicker
+                            value={dateOfBirth || new Date(2000, 0, 1)}
+                            mode="date"
+                            display="spinner"
+                            maximumDate={new Date()}
+                            onChange={(event, selectedDate) => {
+                              if (event.type === 'set' && selectedDate) {
+                                setDateOfBirth(selectedDate);
+                                if (errors.dateOfBirth) {
+                                  setErrors({...errors, dateOfBirth: ''});
+                                }
+                              }
+                            }}
+                            textColor={colors.text}
+                          />
+                        </View>
+                      </View>
+                    </Modal>
+                  ) : (
+                    <DateTimePicker
+                      value={dateOfBirth || new Date(2000, 0, 1)}
+                      mode="date"
+                      display="default"
+                      maximumDate={new Date()}
+                      onChange={(event, selectedDate) => {
+                        setShowDatePicker(false);
+                        if (event.type === 'set' && selectedDate) {
+                          setDateOfBirth(selectedDate);
+                          if (errors.dateOfBirth) {
+                            setErrors({...errors, dateOfBirth: ''});
+                          }
+                        }
+                        // On Android, if user dismisses, event.type may be 'dismissed' or event may not fire
+                        // Either way, we've set showDatePicker to false above
+                      }}
+                    />
+                  )
+                )}
+                </View>
+              </>
             )}
 
             <View>
@@ -308,7 +437,14 @@ export default function LoginScreen() {
 
             <TouchableOpacity
               style={styles.switchButton}
-              onPress={() => setIsSignUp(!isSignUp)}
+              onPress={() => {
+                setIsSignUp(!isSignUp);
+                // Reset sign-up specific fields when switching
+                if (!isSignUp) {
+                  setDateOfBirth(null);
+                  setShowDatePicker(false);
+                }
+              }}
             >
               <Text style={[styles.switchText, { color: colors.primary }]}>
                 {isSignUp 
@@ -601,5 +737,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     width: '100%',
+  },
+  datePickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  datePickerModalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  datePickerCloseButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  datePickerCloseButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -8,6 +8,7 @@ interface UserProfile {
   email: string;
   name: string;
   firstName: string;
+  dateOfBirth?: string; // ISO date string (YYYY-MM-DD)
   created_at: string;
 }
 
@@ -16,7 +17,7 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, firstName: string) => Promise<void>;
+  signUp: (email: string, password: string, firstName: string, dateOfBirth?: Date) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   refreshUserProfile: () => Promise<void>;
@@ -28,6 +29,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    console.log('[COLD_START] AuthProvider mounting...');
+    return () => {
+      console.log('[COLD_START] AuthProvider unmounting');
+    };
+  }, []);
 
   const fetchUserProfile = async (userId: string) => {
     try {
@@ -45,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: data.email,
           name: data.name,
           firstName: data.first_name,
+          dateOfBirth: data.date_of_birth || undefined,
           created_at: data.created_at,
         });
       }
@@ -59,19 +68,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Get initial session - this automatically restores persisted sessions
     const initializeAuth = async () => {
+      console.log('[COLD_START] AuthContext: Starting initialization');
+      const initStartTime = Date.now();
+      
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('[COLD_START] AuthContext: Getting session...');
         
-        if (!mounted) return;
+        // Add timeout protection to prevent infinite hang
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<null>((resolve) => {
+          setTimeout(() => {
+            console.warn('[COLD_START] AuthContext: getSession() timeout after 5s');
+            resolve(null);
+          }, 5000);
+        });
+        
+        const result = await Promise.race([
+          sessionPromise.then(result => ({ type: 'session' as const, value: result })),
+          timeoutPromise.then(() => ({ type: 'timeout' as const, value: null })),
+        ]);
+        
+        if (!mounted) {
+          console.log('[COLD_START] AuthContext: Component unmounted during init');
+          return;
+        }
+
+        if (result.type === 'timeout') {
+          console.warn('[COLD_START] AuthContext: getSession() timed out, proceeding without session');
+          setUser(null);
+          setUserProfile(null);
+          setLoading(false);
+          return;
+        }
+
+        const { data: { session }, error } = result.value;
+
+        const initDuration = Date.now() - initStartTime;
+        console.log(`[COLD_START] AuthContext: Session retrieved in ${initDuration}ms (has session: ${!!session})`);
 
         if (error) {
-          console.error('Error getting session:', error);
+          console.error('[COLD_START] Error getting session:', error);
           setLoading(false);
           return;
         }
 
         if (session?.user) {
           setUser(session.user);
+          console.log('[COLD_START] AuthContext: User set, fetching profile...');
           // Defer profile fetch to not block initial render - use requestIdleCallback if available
           if (typeof requestIdleCallback !== 'undefined') {
             requestIdleCallback(() => {
@@ -85,15 +128,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setUser(null);
           setUserProfile(null);
+          console.log('[COLD_START] AuthContext: No session found');
         }
       } catch (error) {
-        console.error('Error initializing auth:', error);
+        console.error('[COLD_START] Error initializing auth:', error);
         if (mounted) {
           setUser(null);
           setUserProfile(null);
         }
       } finally {
         if (mounted) {
+          const totalDuration = Date.now() - initStartTime;
+          console.log(`[COLD_START] AuthContext: Loading set to false (total init: ${totalDuration}ms)`);
           setLoading(false);
         }
       }
@@ -146,7 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, firstName: string) => {
+  const signUp = async (email: string, password: string, firstName: string, dateOfBirth?: Date) => {
     try {
       // Validate inputs
       if (password.length < 6) {
@@ -157,6 +203,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Please enter a valid email address');
       }
       
+      // Format date of birth as ISO string (YYYY-MM-DD) if provided
+      const dobString = dateOfBirth ? dateOfBirth.toISOString().split('T')[0] : null;
+      
       // Sign up user with metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -165,6 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           data: {
             name: firstName,
             first_name: firstName,
+            date_of_birth: dobString,
           },
         },
       });
@@ -183,6 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           user_email: email,
           user_name: firstName,
           user_first_name: firstName,
+          user_date_of_birth: dobString || null,
         });
         
         if (profileError) {
@@ -208,6 +259,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: authData.user.email || email,
           name: firstName,
           firstName: firstName,
+          dateOfBirth: dobString || undefined,
           created_at: new Date().toISOString(),
         });
       }

@@ -133,8 +133,9 @@ export default function WeeklyCalendar({ onDatePress }: WeeklyCalendarProps) {
               <View style={[
                 styles.dayCircle,
                 { 
-                  backgroundColor: isTodayDate ? colors.primary : colors.card,
+                  backgroundColor: isSelectedDate ? colors.primary : colors.card,
                   borderColor: isTodayDate ? colors.primary : colors.border,
+                  borderWidth: isTodayDate ? 2 : 1
                 }
               ]}>
                 <Text style={[

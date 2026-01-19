@@ -23,7 +23,7 @@ interface HabitListProps {
   onToggleHabit: (id: string) => void;
   onRemoveHabit: (id: string) => void;
   onUpdateHabit?: (id: string, name: string, description?: string) => void;
-  onReorderHabits?: (fromIndex: number, toIndex: number) => void;
+  onReorderHabits?: (reorderedHabits: Habit[]) => void;
   isEditable?: boolean;
 }
 
@@ -171,24 +171,62 @@ export default function HabitList({
   isEditable = true,
 }: HabitListProps) {
   const { colors } = useTheme();
+  // Local state only for immediate UI responsiveness during drag
+  // Parent component (habits prop) is the single source of truth for order
   const [data, setData] = useState(habits);
+  const isProcessingReorderRef = React.useRef(false);
+  const lastReorderedIdsRef = React.useRef<string[] | null>(null);
 
-  // Update local data when habits prop changes
+  // Sync local data from parent, but prevent resetting during reorder operations
+  // This prevents the list from snapping back to old order after dragging
   React.useEffect(() => {
-    setData(habits);
+    // Check if this update matches our reordered state (by comparing IDs)
+    if (lastReorderedIdsRef.current) {
+      const currentIds = habits.map(h => h.id);
+      const reorderedIds = lastReorderedIdsRef.current;
+      
+      // If the IDs match (same items, possibly different order), 
+      // parent has updated to match our reorder - clear the tracking ref
+      if (currentIds.length === reorderedIds.length && 
+          currentIds.every(id => reorderedIds.includes(id))) {
+        lastReorderedIdsRef.current = null;
+        isProcessingReorderRef.current = false;
+        // Keep our local reordered state - it already matches
+        return;
+      }
+    }
+    
+    // Only sync from props if we're not processing a reorder
+    if (!isProcessingReorderRef.current) {
+      setData(habits);
+    }
   }, [habits]);
 
-  // Handle drag end - update order and call parent callback
+  // Handle drag end - pass reordered array to parent (single source of truth)
   const handleDragEnd = useCallback(
-  ({ from, to, data }: { from: number; to: number; data: Habit[] }) => {
-    setData(data);
+    ({ data: reorderedData }: { from: number; to: number; data: Habit[] }) => {
+      // Update local state immediately for UI responsiveness
+      setData(reorderedData);
 
-    if (onReorderHabits && from !== to) {
-      onReorderHabits(from, to);
-    }
-  },
-  [onReorderHabits]
-);
+      if (onReorderHabits) {
+        // Store the IDs of the reordered array to match against parent updates
+        lastReorderedIdsRef.current = reorderedData.map(h => h.id);
+        
+        // Mark that we're processing a reorder
+        isProcessingReorderRef.current = true;
+        
+        // Pass the full reordered array to parent (single source of truth)
+        onReorderHabits(reorderedData);
+        
+        // Allow prop sync after parent has had time to update
+        // The parent will update habits prop with the new order
+        setTimeout(() => {
+          isProcessingReorderRef.current = false;
+        }, 200);
+      }
+    },
+    [onReorderHabits]
+  );
 
 
   const renderItem = useCallback(
