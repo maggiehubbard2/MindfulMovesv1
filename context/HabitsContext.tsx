@@ -23,7 +23,7 @@ interface HabitsContextType {
   updateHabit: (id: string, name: string, description?: string) => Promise<void>;
   toggleHabit: (id: string, date?: Date) => Promise<void>;
   removeHabit: (id: string) => Promise<void>;
-  reorderHabits: (fromIndex: number, toIndex: number) => Promise<void>;
+  reorderHabits: (reorderedHabits: Habit[]) => Promise<void>;
   getHabitsForDate: (date: Date) => Habit[];
   canEditDate: (date: Date) => boolean;
   resetHabitsForNewDay: () => Promise<void>;
@@ -121,6 +121,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const { user } = useAuth();
+  const hasHydratedRef = React.useRef(false);
 
   // Write widget data whenever habits change
   useEffect(() => {
@@ -193,6 +194,50 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
+  // Apply persisted order to habits array
+  // If no order exists, returns habits as-is (preserves default order)
+  const applyPersistedOrder = async (habitsToOrder: Habit[]): Promise<Habit[]> => {
+    try {
+      const savedOrder = await AsyncStorage.getItem('habitOrder');
+      if (savedOrder) {
+        const orderIds: string[] = JSON.parse(savedOrder);
+        
+        // Create a map for O(1) lookup
+        const habitsMap = new Map(habitsToOrder.map(h => [h.id, h]));
+        
+        // Build ordered array: habits in saved order, then any new habits not in order
+        const orderedHabits: Habit[] = [];
+        const processedIds = new Set<string>();
+        
+        // Add habits in saved order
+        for (const id of orderIds) {
+          const habit = habitsMap.get(id);
+          if (habit) {
+            orderedHabits.push(habit);
+            processedIds.add(id);
+          }
+        }
+        
+        // Add any habits that weren't in the saved order (new habits)
+        for (const habit of habitsToOrder) {
+          if (!processedIds.has(habit.id)) {
+            orderedHabits.push(habit);
+          }
+        }
+        
+        return orderedHabits;
+      }
+    } catch (error) {
+      // Silent fail - return habits in original order
+      if (__DEV__) {
+        console.error('Error applying persisted order:', error);
+      }
+    }
+    
+    // No saved order or error - return habits as-is
+    return habitsToOrder;
+  };
+
   // Load from cache first for instant UI
   const loadHabitsFromCache = async () => {
     try {
@@ -211,7 +256,11 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
           ...h,
           completed: (h.completionDates || []).includes(today),
         }));
-        setHabits(updatedHabits);
+        
+        // Apply persisted order before setting state
+        const orderedHabits = await applyPersistedOrder(updatedHabits);
+        setHabits(orderedHabits);
+        hasHydratedRef.current = true;
       }
     } catch (error) {
       // Silent fail - will load from Supabase
@@ -250,12 +299,17 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         };
       });
       
-      // Update state immediately for UI
-      setHabits(supabaseHabits);
+      // Apply persisted order to Supabase habits (preserves user's custom order)
+      const orderedHabits = await applyPersistedOrder(supabaseHabits);
+      
+      // Update state with ordered habits
+      setHabits(orderedHabits);
+      hasHydratedRef.current = true;
       
       // Defer AsyncStorage write to not block UI - use requestIdleCallback if available
+      // Note: We don't overwrite habitOrder here - it's only updated on explicit reorder
       const saveToCache = () => {
-        AsyncStorage.setItem('habits', JSON.stringify(supabaseHabits)).catch(() => {
+        AsyncStorage.setItem('habits', JSON.stringify(orderedHabits)).catch(() => {
           // Silent fail for cache writes
         });
       };
@@ -347,6 +401,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
 
     setHabits(updatedHabits);
     // Defer AsyncStorage write to not block UI
+    // Note: We don't update habitOrder here since we're just resetting completion status, not changing order
     AsyncStorage.setItem('habits', JSON.stringify(updatedHabits)).catch(console.error);
   };
 
@@ -384,10 +439,20 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         completionDates: data.completion_dates || [],
       };
       
-      setHabits([...habits, newHabit]);
+      const newHabits = [...habits, newHabit];
+      setHabits(newHabits);
       
-      // Also save to local storage as backup
-      await AsyncStorage.setItem('habits', JSON.stringify([...habits, newHabit]));
+      // Update order array to include new habit at the end
+      const currentOrder = await AsyncStorage.getItem('habitOrder').then(
+        val => val ? JSON.parse(val) : habits.map(h => h.id)
+      ).catch(() => habits.map(h => h.id));
+      const newOrder = [...currentOrder, newHabit.id];
+      
+      // Persist both habits array and updated order
+      await Promise.all([
+        AsyncStorage.setItem('habits', JSON.stringify(newHabits)),
+        AsyncStorage.setItem('habitOrder', JSON.stringify(newOrder)),
+      ]);
     } catch (error) {
       console.error('Error adding habit to Supabase:', error);
       // Fallback to local storage if Supabase fails
@@ -402,7 +467,18 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       };
       const newHabits = [...habits, newHabit];
       setHabits(newHabits);
-      await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
+      
+      // Update order array to include new habit at the end
+      const currentOrder = await AsyncStorage.getItem('habitOrder').then(
+        val => val ? JSON.parse(val) : habits.map(h => h.id)
+      ).catch(() => habits.map(h => h.id));
+      const newOrder = [...currentOrder, newHabit.id];
+      
+      // Persist both habits array and updated order
+      await Promise.all([
+        AsyncStorage.setItem('habits', JSON.stringify(newHabits)),
+        AsyncStorage.setItem('habitOrder', JSON.stringify(newOrder)),
+      ]);
     }
   };
 
@@ -545,21 +621,52 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     // Update local state
     const newHabits = habits.filter((habit) => habit.id !== id);
     setHabits(newHabits);
-    await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
+    
+    // Update order array to remove deleted habit ID
+    try {
+      const currentOrder = await AsyncStorage.getItem('habitOrder').then(
+        val => val ? JSON.parse(val) : habits.map(h => h.id)
+      ).catch(() => habits.map(h => h.id));
+      const newOrder = currentOrder.filter((habitId: string) => habitId !== id);
+      
+      // Persist both habits array and updated order
+      await Promise.all([
+        AsyncStorage.setItem('habits', JSON.stringify(newHabits)),
+        AsyncStorage.setItem('habitOrder', JSON.stringify(newOrder)),
+      ]);
+    } catch (error) {
+      // Fallback: just save habits if order update fails
+      await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
+    }
   };
 
-  const reorderHabits = async (fromIndex: number, toIndex: number) => {
-    if (fromIndex === toIndex) return;
+  const reorderHabits = async (reorderedHabits: Habit[]) => {
+    // Update habits with the new order from drag-and-drop
+    // This preserves the exact order provided by the reordered array
+    setHabits(reorderedHabits);
     
-    const newHabits = [...habits];
-    const [movedHabit] = newHabits.splice(fromIndex, 1);
-    newHabits.splice(toIndex, 0, movedHabit);
+    // Persist both the full habits array and the order (array of IDs)
+    // This ensures order persists across app closures and relaunches
+    const orderIds = reorderedHabits.map(h => h.id);
     
-    setHabits(newHabits);
-    await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
+    try {
+      await Promise.all([
+        AsyncStorage.setItem('habits', JSON.stringify(reorderedHabits)),
+        AsyncStorage.setItem('habitOrder', JSON.stringify(orderIds)),
+      ]);
+    } catch (error) {
+      // Log but don't throw - UI should remain functional
+      if (__DEV__) {
+        console.error('Error persisting habit order:', error);
+      }
+    }
     
     // Note: We don't persist order to Supabase for now since it's a UI preference
     // If needed, we could add an 'order' field to each habit row
+    // To extend: 
+    //   await Promise.all(reorderedHabits.map((habit, index) => 
+    //     supabase.from('habit').update({ order: index }).eq('id', habit.id)
+    //   ))
   };
 
   // Calculate longest streak - memoized to avoid recalculating on every render
