@@ -15,12 +15,17 @@ interface UserProfile {
 interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
+  /** True only after initial Supabase session hydration has completed. Never flips back to false. */
+  authReady: boolean;
+  /** Same as !authReady during startup; kept for backward compatibility. Do not use for navigation—use authReady. */
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, firstName: string, dateOfBirth?: Date) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   refreshUserProfile: () => Promise<void>;
+  /** Re-fetch session from storage; only for app-resume flow after authReady. Avoids race with initial hydration. */
+  refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,6 +33,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  /** Stable flag: true only after the single initial getSession() has completed. Never set back to false. */
+  const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -48,14 +55,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
       
       if (data) {
-        setUserProfile({
+        const profile = {
           id: data.id,
           email: data.email,
           name: data.name,
           firstName: data.first_name,
           dateOfBirth: data.date_of_birth || undefined,
           created_at: data.created_at,
-        });
+        };
+        setUserProfile(profile);
+        await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
       }
     } catch (error) {
       // Silent error - will retry on next auth state change
@@ -63,59 +72,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Single source of truth: only place that calls getSession() for initial hydration.
+  // No timeout—avoids race where we'd show "logged out" before storage has finished loading.
   useEffect(() => {
     let mounted = true;
 
-    // Get initial session - this automatically restores persisted sessions
     const initializeAuth = async () => {
       console.log('[COLD_START] AuthContext: Starting initialization');
       const initStartTime = Date.now();
-      
+
       try {
-        console.log('[COLD_START] AuthContext: Getting session...');
-        
-        // Add timeout protection to prevent infinite hang
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise<null>((resolve) => {
-          setTimeout(() => {
-            console.warn('[COLD_START] AuthContext: getSession() timeout after 5s');
-            resolve(null);
-          }, 5000);
-        });
-        
-        const result = await Promise.race([
-          sessionPromise.then(result => ({ type: 'session' as const, value: result })),
-          timeoutPromise.then(() => ({ type: 'timeout' as const, value: null })),
+        console.log('[COLD_START] AuthContext: Getting session + cached profile in parallel...');
+        const [sessionResult, cachedProfile] = await Promise.all([
+          supabase.auth.getSession(),
+          AsyncStorage.getItem('userProfile').catch(() => null),
         ]);
-        
+
         if (!mounted) {
           console.log('[COLD_START] AuthContext: Component unmounted during init');
           return;
         }
 
-        if (result.type === 'timeout') {
-          console.warn('[COLD_START] AuthContext: getSession() timed out, proceeding without session');
-          setUser(null);
-          setUserProfile(null);
-          setLoading(false);
-          return;
-        }
-
-        const { data: { session }, error } = result.value;
-
+        const { data: { session }, error } = sessionResult;
         const initDuration = Date.now() - initStartTime;
         console.log(`[COLD_START] AuthContext: Session retrieved in ${initDuration}ms (has session: ${!!session})`);
 
         if (error) {
           console.error('[COLD_START] Error getting session:', error);
+          setUser(null);
+          setUserProfile(null);
           setLoading(false);
+          setAuthReady(true);
           return;
         }
 
         if (session?.user) {
           setUser(session.user);
-          console.log('[COLD_START] AuthContext: User set, fetching profile...');
-          // Defer profile fetch to not block initial render - use requestIdleCallback if available
+          if (cachedProfile) {
+            try {
+              setUserProfile(JSON.parse(cachedProfile));
+            } catch (e) {
+              // Invalid cache, fetch fresh
+            }
+          }
+          console.log('[COLD_START] AuthContext: User set, fetching profile in background...');
           if (typeof requestIdleCallback !== 'undefined') {
             requestIdleCallback(() => {
               fetchUserProfile(session.user.id);
@@ -123,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             setTimeout(() => {
               fetchUserProfile(session.user.id);
-            }, 100);
+            }, 0);
           }
         } else {
           setUser(null);
@@ -139,20 +139,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } finally {
         if (mounted) {
           const totalDuration = Date.now() - initStartTime;
-          console.log(`[COLD_START] AuthContext: Loading set to false (total init: ${totalDuration}ms)`);
+          console.log(`[COLD_START] AuthContext: authReady set (total init: ${totalDuration}ms)`);
           setLoading(false);
+          setAuthReady(true);
         }
       }
     };
 
     initializeAuth();
 
-    // Listen for auth state changes (including token refresh)
+    // Listener only updates user/profile. Does NOT set loading or authReady—prevents race where
+    // listener fires before getSession() completes and would mark "ready" prematurely.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
-
-      // Removed console.log for performance
-      
       if (session?.user) {
         setUser(session.user);
         await fetchUserProfile(session.user.id);
@@ -160,7 +159,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         setUserProfile(null);
       }
-      setLoading(false);
     });
 
     return () => {
@@ -184,8 +182,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
       
-      if (data.user) {
-        await fetchUserProfile(data.user.id);
+      // Explicitly set user state immediately after successful login
+      // This ensures user state is available before navigation happens
+      if (data.user && data.session) {
+        setUser(data.user);
+        
+        // Fetch profile in background - don't block login completion
+        // If it fails or hangs, login should still succeed
+        // onAuthStateChange will also fire and fetch the profile,
+        // ensuring it eventually gets loaded even if this call fails
+        fetchUserProfile(data.user.id).catch((error) => {
+          // Log but don't block - profile will be fetched by onAuthStateChange
+          if (__DEV__) {
+            console.error('Error fetching profile during login (non-blocking):', error);
+          }
+        });
       }
     } catch (error: any) {
       throw error;
@@ -276,6 +287,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'tasks',
         'lastHabitResetDate',
         'lastTaskCheck',
+        'userProfile',
         // Note: Don't clear theme preferences - users might want to keep those
       ]);
       
@@ -308,8 +320,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // For app-resume only: re-fetch session from storage after inactivity. Called only when authReady
+  // so it never races with initial hydration.
+  const refreshSession = async () => {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) return;
+    if (session?.user) {
+      setUser(session.user);
+      await fetchUserProfile(session.user.id);
+    } else {
+      setUser(null);
+      setUserProfile(null);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading, signIn, signUp, logout, resetPassword, refreshUserProfile }}>
+    <AuthContext.Provider value={{ user, userProfile, authReady, loading, signIn, signUp, logout, resetPassword, refreshUserProfile, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );

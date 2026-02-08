@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { HabitsProvider } from '@/context/HabitsContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { useAppRefresh } from '@/hooks/useAppRefresh';
+import { useAppResumeAuth } from '@/hooks/useAppResumeAuth';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
@@ -12,20 +13,19 @@ SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
   const { colors } = useTheme();
-  const { loading } = useAuth();
-  
-  // Enable app refresh on foreground transitions
-  useAppRefresh();
+  const { authReady } = useAuth();
 
-  // Hide splash screen once auth is initialized
+  useAppRefresh();
+  useAppResumeAuth();
+
+  // Hide splash only after auth hydration so we never show Login before we know auth state.
   useEffect(() => {
-    if (!loading) {
-      console.log('[COLD_START] Auth loading complete, hiding splash screen');
+    if (authReady) {
       SplashScreen.hideAsync().catch((error) => {
         console.error('[COLD_START] Error hiding splash screen:', error);
       });
     }
-  }, [loading]);
+  }, [authReady]);
 
   // Safety timeout: hide splash after 5 seconds even if auth is still loading
   useEffect(() => {
