@@ -1,4 +1,5 @@
 import DailyHabitList from '@/components/DailyHabitList';
+import DashboardSkeleton from '@/components/DashboardSkeleton';
 import ReminderCard from '@/components/ReminderCard';
 import ShareStreakScreen from '@/components/ShareStreakScreen';
 import WeeklyCalendar from '@/components/WeeklyCalendar';
@@ -15,7 +16,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function DashboardScreen() {
   const { colors, isDarkMode } = useTheme();
-  const { userProfile, refreshUserProfile } = useAuth();
+  const { userProfile, refreshUserProfile, loading } = useAuth();
+
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
   const { setSelectedDate, getHabitsForDate, selectedDate, habits, calculateLongestStreak, refresh } = useHabits();
   const [showConfetti, setShowConfetti] = useState(false);
   const [showShareScreen, setShowShareScreen] = useState(false);

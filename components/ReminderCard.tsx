@@ -33,9 +33,25 @@ export default function ReminderCard({ onSetReminder }: ReminderCardProps) {
   useEffect(() => {
     // Register for push notifications
     registerForPushNotificationsAsync().then(token => setExpoPushToken(token));
-    
-    // Load reminder time from database
-    loadReminderTime();
+
+    // Load from cache first for instant UI
+    const loadCached = async () => {
+      const cached = await AsyncStorage.getItem('reminderTime');
+      if (cached) {
+        const [hours, minutes] = cached.split(':').map(Number);
+        setReminderTime({ hour: hours, minute: minutes });
+      }
+    };
+    loadCached();
+
+    // Then fetch fresh from database (non-blocking)
+    if (user) {
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(() => loadReminderTimeFromDb());
+      } else {
+        setTimeout(() => loadReminderTimeFromDb(), 0);
+      }
+    }
   }, [user]);
 
   // Re-check notification status when screen comes into focus
@@ -45,32 +61,18 @@ export default function ReminderCard({ onSetReminder }: ReminderCardProps) {
     }, [])
   );
 
-  const loadReminderTime = async () => {
+  const loadReminderTimeFromDb = async () => {
     if (!user) return;
 
     try {
-      // Try cache first
-      const cachedTime = await AsyncStorage.getItem('reminderTime');
-      if (cachedTime) {
-        const [hours, minutes] = cachedTime.split(':').map(Number);
-        setReminderTime({ hour: hours, minute: minutes });
-      }
-
-      // Fetch from database
       const { data, error } = await supabase
         .from('users')
         .select('reminder_time')
         .eq('id', user.id)
         .single();
 
-      // Handle case where column doesn't exist yet (error codes 42703 or PGRST204)
       if (error) {
-        // If column doesn't exist, use default time and don't log as error
-        if (error.code === '42703' || error.code === 'PGRST204') {
-          // Column doesn't exist - user needs to run migration
-          // Keep default 8:00 AM
-          return;
-        }
+        if (error.code === '42703' || error.code === 'PGRST204') return;
         throw error;
       }
 
@@ -80,11 +82,9 @@ export default function ReminderCard({ onSetReminder }: ReminderCardProps) {
         await AsyncStorage.setItem('reminderTime', data.reminder_time);
       }
     } catch (error: any) {
-      // Only log non-column-missing errors
       if (error?.code !== '42703' && error?.code !== 'PGRST204') {
         console.error('Error loading reminder time:', error);
       }
-      // Keep default 8:00 AM
     }
   };
 
