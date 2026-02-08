@@ -11,7 +11,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function TabLayout() {
   const { colors, isDarkMode } = useTheme();
-  const { user, loading } = useAuth();
+  const { user, authReady } = useAuth();
   const colorScheme = useColorScheme();
   const navigationBackground = isDarkMode ? '#F2F2F7' : colors.card;
   const navigationBorder = isDarkMode ? '#C6C6C8' : colors.border;
@@ -25,15 +25,12 @@ export default function TabLayout() {
   const tabBarInactiveColor = isSystemDarkMode ? 'rgba(255, 255, 255, 0.6)' : tabInactiveTint;
 
   useEffect(() => {
-    if (!loading && !user) {
-      console.log('[Tabs] No user detected, routing to /login');
+    if (authReady && !user) {
       router.replace('/login');
-    } else if (user) {
-      console.log('[Tabs] User authenticated, showing tabs');
     }
-  }, [user, loading]);
+  }, [user, authReady]);
 
-  if (loading) {
+  if (!authReady) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -42,7 +39,7 @@ export default function TabLayout() {
   }
 
   if (!user) {
-    return null; // Will redirect to login
+    return null;
   }
 
   return (

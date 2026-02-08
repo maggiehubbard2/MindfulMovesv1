@@ -1,5 +1,7 @@
-import * as SecureStore from 'expo-secure-store';
 import { createClient } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 // Get Supabase credentials from environment variables
 // Create a .env file in the root directory with:
@@ -21,32 +23,43 @@ if (!supabaseUrl || !supabaseAnonKey || supabaseUrl === 'YOUR_SUPABASE_URL' || s
   );
 }
 
-// Create a secure storage adapter using expo-secure-store
-// This stores auth tokens in the device keychain (iOS) or EncryptedSharedPreferences (Android)
-const SecureStoreAdapter = {
+// Use AsyncStorage on web (expo-secure-store has no native module there);
+// use SecureStore on iOS/Android for keychain-backed storage.
+const storageAdapter = {
   getItem: async (key: string): Promise<string | null> => {
     try {
+      if (Platform.OS === 'web') {
+        return await AsyncStorage.getItem(key);
+      }
       return await SecureStore.getItemAsync(key);
     } catch (error) {
-      console.error('Error getting item from SecureStore:', error);
+      console.error('Error getting item from storage:', error);
       return null;
     }
   },
   setItem: async (key: string, value: string): Promise<void> => {
     try {
+      if (Platform.OS === 'web') {
+        await AsyncStorage.setItem(key, value);
+        return;
+      }
       await SecureStore.setItemAsync(key, value, {
-        requireAuthentication: false, // Don't require biometric auth for automatic token refresh
-        keychainAccessible: SecureStore.WHEN_UNLOCKED, // Accessible when device is unlocked
+        requireAuthentication: false,
+        keychainAccessible: SecureStore.WHEN_UNLOCKED,
       });
     } catch (error) {
-      console.error('Error setting item in SecureStore:', error);
+      console.error('Error setting item in storage:', error);
     }
   },
   removeItem: async (key: string): Promise<void> => {
     try {
+      if (Platform.OS === 'web') {
+        await AsyncStorage.removeItem(key);
+        return;
+      }
       await SecureStore.deleteItemAsync(key);
     } catch (error) {
-      console.error('Error removing item from SecureStore:', error);
+      console.error('Error removing item from storage:', error);
     }
   },
 };
@@ -63,8 +76,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     // Detect session from URL (for deep links)
     detectSessionInUrl: true,
-    // Use SecureStore adapter for secure session persistence
-    storage: SecureStoreAdapter,
+    // Use storageAdapter: AsyncStorage on web, SecureStore on iOS/Android
+    storage: storageAdapter,
     // Storage key for session persistence
     storageKey: 'supabase.auth.token',
   },

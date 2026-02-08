@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
   const { colors } = useTheme();
-  const { signIn, signUp, resetPassword, loading: authLoading } = useAuth();
+  const { signIn, signUp, resetPassword, authReady } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -140,11 +140,9 @@ export default function LoginScreen() {
         }
         await signUp(email, password, firstName, dateOfBirth);
         Alert.alert('Success', 'Account created successfully!');
-        console.log('[Login] Sign up successful, routing to /(tabs)/dashboard');
         router.replace('/(tabs)/dashboard');
       } else {
         await signIn(email, password);
-        console.log('[Login] Sign in successful, routing to /(tabs)/dashboard'); 
         router.replace('/(tabs)/dashboard');
       }
     } catch (error: any) {
@@ -172,7 +170,8 @@ export default function LoginScreen() {
     }
   };
 
-  if (authLoading) {
+  // Never show login form until auth hydration is complete (prevents flash of Login on cold start).
+  if (!authReady) {
     return (
       <SafeAreaView style={[styles.loadingContainer, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.loadingContent}>
@@ -199,7 +198,7 @@ export default function LoginScreen() {
           <View style={styles.header}>
             <Text style={[styles.title, { color: colors.text }]}>Mindful Moves</Text>
             <Text style={[styles.subtitle, { color: colors.secondary }]}>
-              {isSignUp ? 'Create your account' : 'Welcome back'}
+              {isSignUp ? 'Create your account' : 'Ready to lock in?'}
             </Text>
           </View>
 
