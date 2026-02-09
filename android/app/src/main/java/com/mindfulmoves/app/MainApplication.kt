@@ -1,4 +1,4 @@
-package com.mindfulmoves
+package com.mindfulmoves.app
 
 import android.app.Application
 import android.content.res.Configuration
