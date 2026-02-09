@@ -87,13 +87,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.mindfulmoves.app'
+    namespace "com.mindfulmoves"
     defaultConfig {
-        applicationId 'com.mindfulmoves.app'
+        applicationId "com.mindfulmoves"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0.2"
+        versionName "1.0"
     }
     signingConfigs {
         debug {
