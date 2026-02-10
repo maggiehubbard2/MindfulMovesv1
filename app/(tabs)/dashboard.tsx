@@ -17,18 +17,57 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function DashboardScreen() {
   const { colors, isDarkMode } = useTheme();
   const { userProfile, refreshUserProfile, loading } = useAuth();
-
-  if (loading) {
-    return <DashboardSkeleton />;
-  }
   const { setSelectedDate, getHabitsForDate, selectedDate, habits, calculateLongestStreak, refresh } = useHabits();
   const [showConfetti, setShowConfetti] = useState(false);
   const [showShareScreen, setShowShareScreen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  // Track previous completion state to detect transitions (prevents confetti on deselection)
   const previousAllCompletedRef = useRef<boolean | null>(null);
 
-  // Get time-based greeting
+  // checkAllHabitsCompleted and useEffects must run every render (Rules of Hooks)
+  const checkAllHabitsCompleted = () => {
+    const habitsForDate = getHabitsForDate(selectedDate);
+    if (habitsForDate.length === 0) {
+      setShowConfetti(false);
+      previousAllCompletedRef.current = false;
+      return;
+    }
+    const allCompleted = habitsForDate.every(habit => habit.completed);
+    const todayNorm = new Date();
+    todayNorm.setHours(0, 0, 0, 0);
+    const selectedDateNormalized = new Date(selectedDate);
+    selectedDateNormalized.setHours(0, 0, 0, 0);
+    const isToday = selectedDateNormalized.getTime() === todayNorm.getTime();
+    if (!isToday) {
+      setShowConfetti(false);
+      previousAllCompletedRef.current = false;
+      return;
+    }
+    const previousAllCompleted = previousAllCompletedRef.current;
+    if (previousAllCompleted === false && allCompleted === true) {
+      setShowConfetti(true);
+      setTimeout(() => {
+        setShowConfetti(false);
+        if (calculateLongestStreak() > 0) setShowShareScreen(true);
+      }, 3000);
+    } else {
+      setShowConfetti(false);
+    }
+    previousAllCompletedRef.current = allCompleted;
+  };
+
+  useEffect(() => {
+    if (!loading) checkAllHabitsCompleted();
+  }, [selectedDate, habits, loading]);
+
+  useEffect(() => {
+    setShowConfetti(false);
+    previousAllCompletedRef.current = null;
+  }, [selectedDate]);
+
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
+
   const today = new Date();
   const hour = today.getHours();
   let greeting = 'Hello';
@@ -52,68 +91,6 @@ export default function DashboardScreen() {
   const handleDatePress = (date: Date) => {
     setSelectedDate(date);
   };
-
-  // Check if all habits are completed and trigger confetti
-  const checkAllHabitsCompleted = () => {
-    const habitsForDate = getHabitsForDate(selectedDate);
-    if (habitsForDate.length === 0) {
-      setShowConfetti(false);
-      previousAllCompletedRef.current = false;
-      return; // No habits, no confetti
-    }
-    
-    const allCompleted = habitsForDate.every(habit => habit.completed);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const selectedDateNormalized = new Date(selectedDate);
-    selectedDateNormalized.setHours(0, 0, 0, 0);
-    const isToday = selectedDateNormalized.getTime() === today.getTime();
-    
-    // Only check for today's habits
-    if (!isToday) {
-      setShowConfetti(false);
-      previousAllCompletedRef.current = false;
-      return;
-    }
-    
-    // Get previous state (null on first render to prevent confetti on initial load)
-    const previousAllCompleted = previousAllCompletedRef.current;
-    
-    // Trigger confetti only when transitioning from incomplete to all complete
-    // This prevents confetti from triggering when deselecting habits or on initial render
-    if (previousAllCompleted === false && allCompleted === true) {
-      setShowConfetti(true);
-      // Hide confetti after animation completes, then show share screen
-      setTimeout(() => {
-        setShowConfetti(false);
-        
-        // Check if there's a streak worth celebrating
-        const streak = calculateLongestStreak();
-        
-      
-        if (streak > 0) {
-          setShowShareScreen(true);
-        }
-      }, 3000);
-    } else {
-      // Don't show confetti for other state transitions (true→false, true→true, or initial render)
-      setShowConfetti(false);
-    }
-    
-    // Update the ref with current state for next comparison
-    previousAllCompletedRef.current = allCompleted;
-  };
-
-  // Check when habits change
-  useEffect(() => {
-    checkAllHabitsCompleted();
-  }, [selectedDate, habits]);
-
-  // Reset confetti and previous state when date changes
-  useEffect(() => {
-    setShowConfetti(false);
-    previousAllCompletedRef.current = null; // Reset to null so we don't trigger on date change
-  }, [selectedDate]);
 
   // Handle habit toggle callback
   const handleHabitToggle = () => {
