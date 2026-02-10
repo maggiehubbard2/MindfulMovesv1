@@ -9,10 +9,10 @@
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		8D73840BA94A74AC8E04A427 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354FA6AAEFC9237EFCFA230C /* ExpoModulesProvider.swift */; };
+		880D9F60C5E4DBB1F235E12C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 495E6EC84F4D85146B8100BE /* PrivacyInfo.xcprivacy */; };
+		95E10AD5DBA216BB6353C31F /* libPods-MindfulMoves.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D7562DCFD16B52CE571A939 /* libPods-MindfulMoves.a */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		D9949296C633B6EFF11AE1A9 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 6E4F6D443B4EEF1E7B2A8973 /* PrivacyInfo.xcprivacy */; };
-		DF47BED1D83A69AC3F4D6B94 /* libPods-MindfulMoves.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F9F6EFBF449B45ED99A7A0AA /* libPods-MindfulMoves.a */; };
+		D5F29DF513E6BD7DC40F9BBC /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64139CC7CE482A9B83174612 /* ExpoModulesProvider.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
@@ -20,16 +20,16 @@
 		13B07F961A680F5B00A75B9A /* MindfulMoves.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MindfulMoves.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = MindfulMoves/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = MindfulMoves/Info.plist; sourceTree = "<group>"; };
-		354FA6AAEFC9237EFCFA230C /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-MindfulMoves/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		6E4F6D443B4EEF1E7B2A8973 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = MindfulMoves/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		A3F416702F971F1A3AB967B5 /* Pods-MindfulMoves.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-MindfulMoves.debug.xcconfig"; path = "Target Support Files/Pods-MindfulMoves/Pods-MindfulMoves.debug.xcconfig"; sourceTree = "<group>"; };
+		2795640BEA118CD9D5A2BB73 /* Pods-MindfulMoves.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-MindfulMoves.release.xcconfig"; path = "Target Support Files/Pods-MindfulMoves/Pods-MindfulMoves.release.xcconfig"; sourceTree = "<group>"; };
+		495E6EC84F4D85146B8100BE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = MindfulMoves/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		64139CC7CE482A9B83174612 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-MindfulMoves/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		65DD6E44C346EAD653827954 /* Pods-MindfulMoves.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-MindfulMoves.debug.xcconfig"; path = "Target Support Files/Pods-MindfulMoves/Pods-MindfulMoves.debug.xcconfig"; sourceTree = "<group>"; };
+		8D7562DCFD16B52CE571A939 /* libPods-MindfulMoves.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-MindfulMoves.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = MindfulMoves/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		CBA08C4226A0FFB3769D0599 /* Pods-MindfulMoves.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-MindfulMoves.release.xcconfig"; path = "Target Support Files/Pods-MindfulMoves/Pods-MindfulMoves.release.xcconfig"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = MindfulMoves/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* MindfulMoves-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "MindfulMoves-Bridging-Header.h"; path = "MindfulMoves/MindfulMoves-Bridging-Header.h"; sourceTree = "<group>"; };
-		F9F6EFBF449B45ED99A7A0AA /* libPods-MindfulMoves.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-MindfulMoves.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -37,21 +37,13 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DF47BED1D83A69AC3F4D6B94 /* libPods-MindfulMoves.a in Frameworks */,
+				95E10AD5DBA216BB6353C31F /* libPods-MindfulMoves.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		09FFD24E8B08282657CBE4E9 /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				146FB0D691F6C4D9A50496B3 /* MindfulMoves */,
-			);
-			name = ExpoModulesProviders;
-			sourceTree = "<group>";
-		};
 		13B07FAE1A68108700A75B9A /* MindfulMoves */ = {
 			isa = PBXGroup;
 			children = (
@@ -61,15 +53,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				6E4F6D443B4EEF1E7B2A8973 /* PrivacyInfo.xcprivacy */,
-			);
-			name = MindfulMoves;
-			sourceTree = "<group>";
-		};
-		146FB0D691F6C4D9A50496B3 /* MindfulMoves */ = {
-			isa = PBXGroup;
-			children = (
-				354FA6AAEFC9237EFCFA230C /* ExpoModulesProvider.swift */,
+				495E6EC84F4D85146B8100BE /* PrivacyInfo.xcprivacy */,
 			);
 			name = MindfulMoves;
 			sourceTree = "<group>";
@@ -78,9 +62,35 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				F9F6EFBF449B45ED99A7A0AA /* libPods-MindfulMoves.a */,
+				8D7562DCFD16B52CE571A939 /* libPods-MindfulMoves.a */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		4A08E2D33BCE5226FD4CCCD5 /* MindfulMoves */ = {
+			isa = PBXGroup;
+			children = (
+				64139CC7CE482A9B83174612 /* ExpoModulesProvider.swift */,
+			);
+			name = MindfulMoves;
+			sourceTree = "<group>";
+		};
+		50D123A483A0F7BF0F71B517 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				65DD6E44C346EAD653827954 /* Pods-MindfulMoves.debug.xcconfig */,
+				2795640BEA118CD9D5A2BB73 /* Pods-MindfulMoves.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		64B5D9D3D44FE63A9471E184 /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				4A08E2D33BCE5226FD4CCCD5 /* MindfulMoves */,
+			);
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -97,8 +107,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				9649C1BDC3D45C664A8EBECA /* Pods */,
-				09FFD24E8B08282657CBE4E9 /* ExpoModulesProviders */,
+				50D123A483A0F7BF0F71B517 /* Pods */,
+				64B5D9D3D44FE63A9471E184 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -111,16 +121,6 @@
 				13B07F961A680F5B00A75B9A /* MindfulMoves.app */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		9649C1BDC3D45C664A8EBECA /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				A3F416702F971F1A3AB967B5 /* Pods-MindfulMoves.debug.xcconfig */,
-				CBA08C4226A0FFB3769D0599 /* Pods-MindfulMoves.release.xcconfig */,
-			);
-			name = Pods;
-			path = Pods;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -140,13 +140,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "MindfulMoves" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				455EE0547B1A788920969C0E /* [Expo] Configure project */,
+				42AD00212B6927F630E270C2 /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				292F2BF221FF2C10985E5530 /* [CP] Embed Pods Frameworks */,
+				BD33210C96D231D81591644A /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -196,7 +196,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				D9949296C633B6EFF11AE1A9 /* PrivacyInfo.xcprivacy in Resources */,
+				880D9F60C5E4DBB1F235E12C /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -240,25 +240,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		292F2BF221FF2C10985E5530 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-MindfulMoves/Pods-MindfulMoves-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-MindfulMoves/Pods-MindfulMoves-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		455EE0547B1A788920969C0E /* [Expo] Configure project */ = {
+		42AD00212B6927F630E270C2 /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -325,6 +307,24 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-MindfulMoves/Pods-MindfulMoves-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
+		BD33210C96D231D81591644A /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-MindfulMoves/Pods-MindfulMoves-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-MindfulMoves/Pods-MindfulMoves-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -333,7 +333,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				8D73840BA94A74AC8E04A427 /* ExpoModulesProvider.swift in Sources */,
+				D5F29DF513E6BD7DC40F9BBC /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -342,7 +342,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = A3F416702F971F1A3AB967B5 /* Pods-MindfulMoves.debug.xcconfig */;
+			baseConfigurationReference = 65DD6E44C346EAD653827954 /* Pods-MindfulMoves.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -378,7 +378,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = CBA08C4226A0FFB3769D0599 /* Pods-MindfulMoves.release.xcconfig */;
+			baseConfigurationReference = 2795640BEA118CD9D5A2BB73 /* Pods-MindfulMoves.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
