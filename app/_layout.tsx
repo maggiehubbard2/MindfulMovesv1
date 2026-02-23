@@ -4,19 +4,44 @@ import { HabitsProvider } from '@/context/HabitsContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { useAppRefresh } from '@/hooks/useAppRefresh';
 import { useAppResumeAuth } from '@/hooks/useAppResumeAuth';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
 // Prevent splash screen from auto-hiding while we load
-SplashScreen.preventAutoHideAsync();
+// SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
   const { colors } = useTheme();
-  const { authReady } = useAuth();
+  const router = useRouter();
+const segments = useSegments();
+  const { authReady, user } = useAuth();
 
   useAppRefresh();
   useAppResumeAuth();
+
+   const inLogin = segments[0] === 'login';
+  const inTabs = segments[0] === '(tabs)';
+
+  useEffect(() => {
+    console.log('checking authready: ', authReady);
+    if (!authReady) return;
+
+    const firstSegment = segments[0];
+    const inLogin = firstSegment === 'login';
+
+    if (!user && !inLogin) {
+      console.log('redirecting to /login');
+      router.replace('/login');
+      return;
+    }
+
+    if (user && (inLogin || !firstSegment)) {
+      console.log('redirecting to /dashboard');
+      router.replace('/dashboard');
+    }
+
+}, [user, authReady, segments]);
 
   // Hide splash only after auth hydration so we never show Login before we know auth state.
   useEffect(() => {
@@ -38,6 +63,8 @@ function RootLayoutNav() {
 
     return () => clearTimeout(timeout);
   }, []);
+
+  console.log('Rendering Stack. User:', user, 'AuthReady:', authReady, 'Segments:', segments);
   
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -69,12 +96,14 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   useEffect(() => {
+    SplashScreen.preventAutoHideAsync();
     console.log('[COLD_START] RootLayout mounting...');
-    console.log('[COLD_START] Preventing splash auto-hide');
+    
     return () => {
       console.log('[COLD_START] RootLayout unmounting');
     };
   }, []);
+
 
   return (
     <ThemeProvider>

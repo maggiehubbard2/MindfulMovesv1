@@ -37,6 +37,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const safeSetUserProfile = async (profile: UserProfile) => {
+  try {
+    setUserProfile(profile);
+    await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
+  } catch (error) {
+    console.warn('[AuthContext] Failed to cache user profile, continuing anyway', error);
+  }
+};
+
   useEffect(() => {
     console.log('[COLD_START] AuthProvider mounting...');
     return () => {
@@ -64,7 +73,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           created_at: data.created_at,
         };
         setUserProfile(profile);
-        await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
+        // await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
+        await safeSetUserProfile(profile);
       }
     } catch (error) {
       // Silent error - will retry on next auth state change
@@ -74,98 +84,104 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Single source of truth: only place that calls getSession() for initial hydration.
   // No timeout—avoids race where we'd show "logged out" before storage has finished loading.
-  useEffect(() => {
-    let mounted = true;
+useEffect(() => {
+  let mounted = true;
 
-    const initializeAuth = async () => {
-      console.log('[COLD_START] AuthContext: Starting initialization');
-      const initStartTime = Date.now();
+  // Generic helper: wraps a promise with a timeout
+  function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+      promise
+        .then((res) => {
+          clearTimeout(timer);
+          resolve(res);
+        })
+        .catch((err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
+    });
+  }
 
-      try {
-        console.log('[COLD_START] AuthContext: Getting session + cached profile in parallel...');
-        const [sessionResult, cachedProfile] = await Promise.all([
-          supabase.auth.getSession(),
-          AsyncStorage.getItem('userProfile').catch(() => null),
-        ]);
+  const initializeAuth = async () => {
+    console.log('[COLD_START] AuthContext: Starting initialization');
 
-        if (!mounted) {
-          console.log('[COLD_START] AuthContext: Component unmounted during init');
-          return;
-        }
+    let session = null;
+    let cachedProfile: string | null = null;
 
-        const { data: { session }, error } = sessionResult;
-        const initDuration = Date.now() - initStartTime;
-        console.log(`[COLD_START] AuthContext: Session retrieved in ${initDuration}ms (has session: ${!!session})`);
+    try {
+      cachedProfile = await AsyncStorage.getItem('userProfile');
+      if (__DEV__) console.log('[COLD_START] Cached profile loaded', cachedProfile);
 
-        if (error) {
-          console.error('[COLD_START] Error getting session:', error);
-          setUser(null);
-          setUserProfile(null);
-          setLoading(false);
-          setAuthReady(true);
-          return;
-        }
+      const sessionResult = await withTimeout(
+        supabase.auth.getSession(),
+        5000,
+        'supabase.auth.getSession() timed out'
+      );
 
-        if (session?.user) {
-          setUser(session.user);
-          if (cachedProfile) {
-            try {
-              setUserProfile(JSON.parse(cachedProfile));
-            } catch (e) {
-              // Invalid cache, fetch fresh
-            }
-          }
-          console.log('[COLD_START] AuthContext: User set, fetching profile in background...');
-          if (typeof requestIdleCallback !== 'undefined') {
-            requestIdleCallback(() => {
-              fetchUserProfile(session.user.id);
-            });
-          } else {
-            setTimeout(() => {
-              fetchUserProfile(session.user.id);
-            }, 0);
-          }
-        } else {
-          setUser(null);
-          setUserProfile(null);
-          console.log('[COLD_START] AuthContext: No session found');
-        }
-      } catch (error) {
-        console.error('[COLD_START] Error initializing auth:', error);
-        if (mounted) {
-          setUser(null);
-          setUserProfile(null);
-        }
-      } finally {
-        if (mounted) {
-          const totalDuration = Date.now() - initStartTime;
-          console.log(`[COLD_START] AuthContext: authReady set (total init: ${totalDuration}ms)`);
-          setLoading(false);
-          setAuthReady(true);
-        }
-      }
-    };
+      session = sessionResult.data.session;
+      console.log('[COLD_START] Session retrieved (has session: %s)', !!session);
+    } catch (error) {
+      console.error('[COLD_START] getSession failed:', error);
+    }
 
-    initializeAuth();
+    if (!mounted) return;
 
-    // Listener only updates user/profile. Does NOT set loading or authReady—prevents race where
-    // listener fires before getSession() completes and would mark "ready" prematurely.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
+    try {
       if (session?.user) {
         setUser(session.user);
-        await fetchUserProfile(session.user.id);
+
+        if (cachedProfile) {
+          try {
+            setUserProfile(JSON.parse(cachedProfile));
+          } catch {
+            console.warn('[COLD_START] Invalid cached profile, fetching fresh...');
+          }
+        }
+
+        // Fetch profile in background
+        if (typeof requestIdleCallback !== 'undefined') {
+          requestIdleCallback(() => fetchUserProfile(session.user.id));
+        } else {
+          setTimeout(() => fetchUserProfile(session.user.id), 0);
+        }
       } else {
         setUser(null);
         setUserProfile(null);
+        console.log('[COLD_START] No session found');
       }
-    });
+    } catch (error) {
+      console.error('[COLD_START] Error setting user/profile:', error);
+      setUser(null);
+      setUserProfile(null);
+    } finally {
+      if (mounted) {
+        setLoading(false);
+        setAuthReady(true);
+        console.log('[AuthContext] authReady true');
+      }
+    }
+  };
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
+  initializeAuth();
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    if (!mounted) return;
+
+    if (session?.user) {
+      setUser(session.user);
+      await fetchUserProfile(session.user.id);
+    } else {
+      setUser(null);
+      setUserProfile(null);
+    }
+  });
+
+  return () => {
+    mounted = false;
+    subscription.unsubscribe();
+  };
+}, []);
 
   const signIn = async (email: string, password: string) => {
     try {
