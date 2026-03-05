@@ -69,10 +69,7 @@ export default function LoginScreen() {
       }
 
       // Date of birth validation
-      if (!dateOfBirth) {
-        newErrors.dateOfBirth = 'Date of birth is required';
-        isValid = false;
-      } else {
+      if (dateOfBirth) {
         // Check if date is in the future
         const today = new Date();
         today.setHours(0, 0, 0, 0);
