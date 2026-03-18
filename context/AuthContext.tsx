@@ -1,6 +1,7 @@
-import { supabase } from '@/config/supabase';
+import { supabase, supabaseUrl } from '@/config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '@supabase/supabase-js';
+import { router } from 'expo-router';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 interface UserProfile {
@@ -22,6 +23,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, firstName: string, dateOfBirth?: Date) => Promise<void>;
   logout: () => Promise<void>;
+  deleteUserInfo: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   refreshUserProfile: () => Promise<void>;
   /** Re-fetch session from storage; only for app-resume flow after authReady. Avoids race with initial hydration. */
@@ -29,6 +31,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -319,6 +322,48 @@ useEffect(() => {
     }
   };
 
+const deleteUserInfo = async () => {
+  console.log('*****deleteUserInfo called');
+  try {
+    console.log('supabaseUrl:', `${supabaseUrl}/functions/v1/delete-account`) // is this a valid URL?
+
+    const { data: { session } } = await supabase.auth.getSession()
+    console.log('token exists:', !!session?.access_token)
+    if (!session) {
+      alert("No active session")
+      return
+    }
+
+    console.log('Initiating account deletion for user:', session.user.id, 'at url:', `${supabaseUrl}/functions/v1/delete-account`);
+
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/delete-account`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      }
+    )
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to delete account")
+    }
+
+    await supabase.auth.signOut()
+
+    // navigate to login screen
+    router.replace("/login")
+
+  } catch (error) {
+    console.error("Delete account error:", error)
+    alert("Failed to delete account")
+  }
+}
+
+
   const resetPassword = async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -351,7 +396,7 @@ useEffect(() => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userProfile, authReady, loading, signIn, signUp, logout, resetPassword, refreshUserProfile, refreshSession }}>
+    <AuthContext.Provider value={{ user, userProfile, authReady, loading, signIn, signUp, logout, deleteUserInfo, resetPassword, refreshUserProfile, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );

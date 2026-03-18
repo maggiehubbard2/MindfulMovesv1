@@ -23,3 +23,6 @@ export const supabase = createClient(
     },
   }
 );
+
+export { hasValidEnv, supabaseUrl };
+
