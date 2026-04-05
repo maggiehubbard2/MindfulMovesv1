@@ -11,6 +11,7 @@ interface UserProfile {
   firstName: string;
   dateOfBirth?: string; // ISO date string (YYYY-MM-DD)
   created_at: string;
+  isAdmin?: boolean;
 }
 
 interface AuthContextType {
@@ -60,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select('*, is_admin')
         .eq('id', userId)
         .single();
       
@@ -74,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           firstName: data.first_name,
           dateOfBirth: data.date_of_birth || undefined,
           created_at: data.created_at,
+          isAdmin: data.is_admin,
         };
         setUserProfile(profile);
         // await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
