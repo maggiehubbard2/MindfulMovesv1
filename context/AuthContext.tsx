@@ -112,21 +112,21 @@ useEffect(() => {
     let session = null;
     let cachedProfile: string | null = null;
 
-    try {
-      cachedProfile = await AsyncStorage.getItem('userProfile');
-      if (__DEV__) console.log('[COLD_START] Cached profile loaded', cachedProfile);
+  try {
+    cachedProfile = await AsyncStorage.getItem('userProfile');
+    console.log('[DEBUG] AsyncStorage success');
+  } catch (e) {
+    console.error('[DEBUG] AsyncStorage failed:', e);
+  }
 
-      const sessionResult = await withTimeout(
-        supabase.auth.getSession(),
-        5000,
-        'supabase.auth.getSession() timed out'
-      );
-
-      session = sessionResult.data.session;
-      console.log('[COLD_START] Session retrieved (has session: %s)', !!session);
-    } catch (error) {
-      console.error('[COLD_START] getSession failed:', error);
-    }
+  try {
+    const sessionResult = await supabase.auth.getSession();
+    session = sessionResult.data.session;
+    
+    console.log('[DEBUG] getSession success');
+  } catch (e) {
+    console.error('[DEBUG] getSession failed:', e);
+  }
 
     if (!mounted) return;
 
@@ -148,11 +148,7 @@ useEffect(() => {
         } else {
           setTimeout(() => fetchUserProfile(session.user.id), 0);
         }
-      } else {
-        setUser(null);
-        setUserProfile(null);
-        console.log('[COLD_START] No session found');
-      }
+      } 
     } catch (error) {
       console.error('[COLD_START] Error setting user/profile:', error);
       setUser(null);
