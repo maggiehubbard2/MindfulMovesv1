@@ -129,13 +129,8 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      if (isSignUp) {
-        if (!dateOfBirth) {
-          Alert.alert('Error', 'Please select your date of birth');
-          setLoading(false);
-          return;
-        }
-        await signUp(email, password, firstName, dateOfBirth);
+      if (isSignUp) {       
+        await signUp(email, password, firstName, dateOfBirth || undefined);
         Alert.alert('Success', 'Account created successfully!');
         router.replace('/(tabs)/dashboard');
       } else {
