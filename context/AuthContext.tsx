@@ -92,22 +92,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 useEffect(() => {
   let mounted = true;
 
-  // Generic helper: wraps a promise with a timeout
-  function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
-      promise
-        .then((res) => {
-          clearTimeout(timer);
-          resolve(res);
-        })
-        .catch((err) => {
-          clearTimeout(timer);
-          reject(err);
-        });
-    });
-  }
-
   const initializeAuth = async () => {
     console.log('[COLD_START] AuthContext: Starting initialization');
 
@@ -116,58 +100,72 @@ useEffect(() => {
 
   try {
     cachedProfile = await AsyncStorage.getItem('userProfile');
-    console.log('[DEBUG] AsyncStorage success');
+    console.log('[COLD_START] AsyncStorage userProfile read complete');
   } catch (e) {
-    console.error('[DEBUG] AsyncStorage failed:', e);
+    console.error('[COLD_START] AsyncStorage failed:', e);
   }
 
   try {
     const sessionResult = await supabase.auth.getSession();
     session = sessionResult.data.session;
     
-    console.log('[DEBUG] getSession success');
+    console.log('[COLD_START] getSession complete');
   } catch (e) {
-    console.error('[DEBUG] getSession failed:', e);
+    console.error('[COLD_START] getSession failed:', e);
   }
 
-    if (!mounted) return;
+    if (mounted) {
+      try {
+        if (session?.user) {
+          setUser(session.user);
 
-    try {
-      if (session?.user) {
-        setUser(session.user);
-
-        if (cachedProfile) {
-          try {
-            setUserProfile(JSON.parse(cachedProfile));
-          } catch {
-            console.warn('[COLD_START] Invalid cached profile, fetching fresh...');
+          if (cachedProfile) {
+            try {
+              setUserProfile(JSON.parse(cachedProfile));
+            } catch {
+              console.warn('[COLD_START] Invalid cached profile, fetching fresh...');
+            }
           }
-        }
 
-        // Fetch profile in background
-        if (typeof requestIdleCallback !== 'undefined') {
-          requestIdleCallback(() => fetchUserProfile(session.user.id));
-        } else {
-          setTimeout(() => fetchUserProfile(session.user.id), 0);
-        }
-      } 
-    } catch (error) {
-      console.error('[COLD_START] Error setting user/profile:', error);
-      setUser(null);
-      setUserProfile(null);
-    } finally {
-      if (mounted) {
-        setLoading(false);
-        setAuthReady(true);
-        console.log('[AuthContext] authReady true');
+          // Fetch profile in background
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(() => fetchUserProfile(session.user.id));
+          } else {
+            setTimeout(() => fetchUserProfile(session.user.id), 0);
+          }
+        } 
+      } catch (error) {
+        console.error('[COLD_START] Error setting user/profile:', error);
+        setUser(null);
+        setUserProfile(null);
       }
+    }
+
+    if (mounted) {
+      setLoading(false);
+      setAuthReady(true);
+      console.log('[COLD_START] authReady true');
+    } else {
+      console.log('[COLD_START] Auth init finished after unmount; skipping setAuthReady');
     }
   };
 
   initializeAuth();
 
+  const hasInitializedRef = { current: false };
+
+
   const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-    if (!mounted) return;
+
+      // Skip duplicate handling of the initial session event (getSession is the source of truth for hydration).
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      console.log('[COLD_START] Skipping initial onAuthStateChange event:', _event);
+      return;
+    }
+
+    console.log('[COLD_START] onAuthStateChange event:', _event);
+
 
     if (session?.user) {
       setUser(session.user);
