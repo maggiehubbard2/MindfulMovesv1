@@ -1,14 +1,16 @@
 import { useHabits } from '@/context/HabitsContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
+  Easing,
+  LinearTransition,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -17,9 +19,12 @@ interface DailyHabitListProps {
   maxItems?: number;
 }
 
+const listMoveTransition = LinearTransition.easing(Easing.out(Easing.cubic)).duration(900);
+
 export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitListProps) {
   const { selectedDate, getHabitsForDate, toggleHabit, canEditDate } = useHabits();
   const { colors } = useTheme();
+  const [pendingCompletedIds, setPendingCompletedIds] = useState<Set<string>>(new Set());
   
   const habits = getHabitsForDate(selectedDate);
   const isEditable = canEditDate(selectedDate);
@@ -27,12 +32,14 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
   // Sort habits: unchecked first (for dashboard view only)
   // This keeps the user's custom order but prioritizes incomplete habits
   const sortedHabits = [...habits].sort((a, b) => {
-    if (a.completed === b.completed) {
+    const aEffectiveCompleted = a.completed && !pendingCompletedIds.has(a.id);
+    const bEffectiveCompleted = b.completed && !pendingCompletedIds.has(b.id);
+    if (aEffectiveCompleted === bEffectiveCompleted) {
       // If both have same completion status, maintain original order
       return 0;
     }
     // Unchecked items come first
-    return a.completed ? 1 : -1;
+    return aEffectiveCompleted ? 1 : -1;
   });
 
   const displayedHabits = sortedHabits;
@@ -68,6 +75,22 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
 
   const handleToggle = (id: string) => {
     if (!isEditable) return;
+    const habit = habits.find((h) => h.id === id);
+    if (habit && !habit.completed) {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setPendingCompletedIds((prev) => {
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      });
+      setTimeout(() => {
+        setPendingCompletedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }, 1400);
+    }
     toggleHabit(id, selectedDate);
     onHabitToggle?.(id);
   };
@@ -186,29 +209,38 @@ interface AnimatedHabitRowProps {
 function AnimatedHabitRow({ habit, index, isLast, icon, colors, isEditable, streak, onToggle }: AnimatedHabitRowProps) {
   const isCompleted = habit.completed;
   const indicatorScale = useSharedValue(1);
-  const checkmarkScale = useSharedValue(0);
+  const checkmarkScale = useSharedValue(isCompleted ? 1 : 0);
   const cardScale = useSharedValue(1);
+  const strikeProgress = useSharedValue(isCompleted ? 1 : 0);
+  const rowTranslateY = useSharedValue(0);
   const [wasCompleted, setWasCompleted] = useState(isCompleted);
 
   useEffect(() => {
     if (isCompleted && !wasCompleted) {
       // Bounce animation when completed
       indicatorScale.value = withSequence(
-        withSpring(1.3, { damping: 6, stiffness: 200 }),
-        withSpring(1, { damping: 8, stiffness: 200 })
+        withTiming(1.18, { duration: 140 }),
+        withTiming(1.0, { duration: 120 })
       );
       checkmarkScale.value = withSequence(
-        withTiming(0, { duration: 0 }),
-        withSpring(1, { damping: 8, stiffness: 200 })
+        withTiming(0, { duration: 120 }),
+        withTiming(1, { duration: 200 })
       );
       cardScale.value = withSequence(
-        withSpring(1.02, { damping: 10, stiffness: 150 }),
-        withSpring(1, { damping: 10, stiffness: 150 })
+        withTiming(0.985, { duration: 90 }),
+        withTiming(1.0, { duration: 190 })
       );
+      rowTranslateY.value = withSequence(
+        withTiming(2, { duration: 120 }),
+        withTiming(0, { duration: 160 })
+      );
+      strikeProgress.value = withTiming(1, { duration: 520 });
     } else if (!isCompleted) {
-      checkmarkScale.value = withTiming(0, { duration: 150 });
-      indicatorScale.value = withTiming(1, { duration: 150 });
-      cardScale.value = withTiming(1, { duration: 150 });
+      strikeProgress.value = withTiming(0, { duration: 220 });
+      checkmarkScale.value = withTiming(0, { duration: 140 });
+      indicatorScale.value = withTiming(1, { duration: 140 });
+      cardScale.value = withTiming(1, { duration: 140 });
+      rowTranslateY.value = withTiming(0, { duration: 140 });
     }
     setWasCompleted(isCompleted);
   }, [isCompleted]);
@@ -222,11 +254,15 @@ function AnimatedHabitRow({ habit, index, isLast, icon, colors, isEditable, stre
   }));
 
   const animatedCardStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: cardScale.value }],
+    transform: [{ scale: cardScale.value }, { translateY: rowTranslateY.value }],
+  }));
+
+  const animatedStrikeStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleX: strikeProgress.value }],
   }));
 
   return (
-    <View style={styles.habitRow}>
+    <Animated.View style={styles.habitRow} layout={listMoveTransition}>
       {/* Check Circle - Centered vertically */}
       <TouchableOpacity
         onPress={onToggle}
@@ -286,20 +322,28 @@ function AnimatedHabitRow({ habit, index, isLast, icon, colors, isEditable, stre
           {/* Habit Info */}
           <View style={styles.habitInfo}>
             <View style={styles.habitNameRow}>
-              <Text 
-                style={[
-                  styles.habitName,
-                  { 
-                    color: isCompleted ? colors.secondary : colors.text, // Muted text color for completed
-                    textDecorationLine: isCompleted ? 'line-through' : 'none',
-                    textDecorationColor: colors.secondary, // Make strikethrough more visible
-                  }
-                ]}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {habit.name}
-              </Text>
+              <View style={styles.habitNameWrap}>
+                <Text 
+                  style={[
+                    styles.habitName,
+                    { 
+                      color: isCompleted ? colors.secondary : colors.text, // Muted text color for completed
+                    }
+                  ]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {habit.name}
+                </Text>
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    styles.strikeLine,
+                    { backgroundColor: colors.secondary },
+                    animatedStrikeStyle,
+                  ]}
+                />
+              </View>
               {/* Streak Indicator */}
               {streak > 1 && (
                 <View style={styles.streakIndicator} pointerEvents="none">
@@ -327,7 +371,7 @@ function AnimatedHabitRow({ habit, index, isLast, icon, colors, isEditable, stre
           </View>
         </TouchableOpacity>
       </Animated.View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -439,6 +483,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
     minWidth: 0,
+  },
+  habitNameWrap: {
+    flex: 1,
+    minWidth: 0,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  strikeLine: {
+    position: 'absolute',
+    left: 0,
+    top: '52%',
+    width: '100%',
+    height: 2,
+    borderRadius: 1,
   },
   habitDescription: {
     fontSize: 12,
