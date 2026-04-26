@@ -14,9 +14,11 @@ const INACTIVITY_THRESHOLD_MS = 60 * 1000; // 60 seconds
 export function useAppResumeAuth() {
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const isInitialMount = useRef(true);
+  const isRefreshing = useRef(false);
   const { authReady, refreshSession } = useAuth();
 
   useEffect(() => {
+    console.log('[AppResumeAuth] Setting up app state listener, initial state:', appState.current);
     const subscription = AppState.addEventListener('change', async (nextAppState: AppStateStatus) => {
       const previousState = appState.current;
       appState.current = nextAppState;
@@ -56,9 +58,10 @@ export function useAppResumeAuth() {
     return () => {
       subscription.remove();
     };
-  }, [authReady]);
+  }, []);
 
   const checkAndRefreshSession = async () => {
+    console.log('checkAndRefreshSession called...');
     try {
       const backgroundTimestampStr = await SecureStore.getItemAsync(BACKGROUND_TIMESTAMP_KEY);
       if (!backgroundTimestampStr) {
@@ -76,14 +79,19 @@ export function useAppResumeAuth() {
         console.log(`[AppResumeAuth] App was inactive for ${Math.round(inactiveDuration / 1000)}s`);
       }
 
-      if (inactiveDuration >= INACTIVITY_THRESHOLD_MS) {
+      if (inactiveDuration >= INACTIVITY_THRESHOLD_MS && !isRefreshing.current) {
         if (__DEV__) {
           console.log('[AppResumeAuth] Inactivity threshold exceeded, refreshing session via AuthContext...');
         }
-        await refreshSession();
+        try {
+          isRefreshing.current = true;
+          await refreshSession();
+        } finally {
+          isRefreshing.current = false;
+        }
       }
 
-      await SecureStore.deleteItemAsync(BACKGROUND_TIMESTAMP_KEY).catch(() => {});
+      await SecureStore.deleteItemAsync(BACKGROUND_TIMESTAMP_KEY).catch(() => { });
     } catch (error) {
       if (__DEV__) {
         console.error('[AppResumeAuth] Error checking/refreshing session:', error);

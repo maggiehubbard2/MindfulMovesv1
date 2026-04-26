@@ -50,8 +50,9 @@ const normalizeHex = (hex: string) => {
 
 export default function SettingsScreen() {
   const { isDarkMode, toggleDarkMode, colors, accentColor, setAccentColor, customAccentColor } = useTheme();
-  const { user, userProfile, logout } = useAuth();
+  const { user, userProfile, logout, deleteUserInfo } = useAuth();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [tempCustomColor, setTempCustomColor] = useState(customAccentColor);
   const [hexInput, setHexInput] = useState(customAccentColor);
@@ -371,10 +372,32 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleLogout = () => {
-    setShowLogoutModal(true);
+    const confirmDeleteAccount
+     = async () => {
+      console.log('User confirmed account deletion');
+    try {
+      setShowDeleteAccountModal(false); // Close modal first for better UX
+      console.log('Calling deleteUserInfo function');
+      await deleteUserInfo(); // Assuming you have a deleteUserInfo function
+      // Don't navigate manually - let index.tsx handle it based on user state
+      // This avoids race conditions and ensures auth state has propagated
+    } catch (error: any) {
+      console.error('Error deleting account:', error);
+      Alert.alert('Error', error?.message || 'Failed to delete account');
+      // Reopen modal if deletion failed
+      setShowDeleteAccountModal(true);
+    }
   };
 
+
+  const handleDeleteAccount = () => {
+    setShowDeleteAccountModal(true);
+  };
+ 
+   const handleLogout = () => {
+    setShowLogoutModal(true);
+  };
+  
   const accentColorOptions = [
     { name: 'Blue', value: 'blue', color: '#007AFF' },
     { name: 'Pink', value: 'pink', color: '#ff60ce' },
@@ -603,12 +626,23 @@ export default function SettingsScreen() {
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.secondary} />
           </TouchableOpacity>
+        
+       {/* Logout button */}
           <TouchableOpacity
-            style={[styles.logoutButton, { backgroundColor: '#FF3B30' }]}
+            style={[styles.logoutButton, { backgroundColor: '#5e5d5d' }]}
             onPress={handleLogout}
           >
             <Ionicons name="log-out-outline" size={20} color="white" />
             <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+
+        {/* Delete Account button */}
+          <TouchableOpacity
+            style={[styles.logoutButton, { backgroundColor: '#FF3B30' }]}
+            onPress={handleDeleteAccount}
+          >
+            <Ionicons name="skull-outline" size={20} color="white" />
+            <Text style={styles.logoutText}>Delete Account</Text>
           </TouchableOpacity>
         </View>
 
@@ -750,6 +784,38 @@ export default function SettingsScreen() {
                 onPress={confirmLogout}
               >
                 <Text style={styles.modalButtonText}>Logout</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal
+        visible={showDeleteAccountModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDeleteAccountModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <Ionicons name="log-out-outline" size={48} color="#FF3B30" style={styles.modalIcon} />
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Delete Account</Text>
+            <Text style={[styles.modalMessage, { color: colors.secondary }]}>
+              Are you sure you want to delete your account and all related data? This cannot be undone.
+            </Text>
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: colors.border }]}
+                onPress={() => setShowDeleteAccountModal(false)}
+              >
+                <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: '#FF3B30' }]}
+                onPress={confirmDeleteAccount}
+              >
+                <Text style={styles.modalButtonText}>Delete Account</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -1,6 +1,7 @@
-import { supabase } from '@/config/supabase';
+import { supabase, supabaseUrl } from '@/config/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '@supabase/supabase-js';
+import { router } from 'expo-router';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 interface UserProfile {
@@ -10,6 +11,7 @@ interface UserProfile {
   firstName: string;
   dateOfBirth?: string; // ISO date string (YYYY-MM-DD)
   created_at: string;
+  isAdmin?: boolean;
 }
 
 interface AuthContextType {
@@ -22,6 +24,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, firstName: string, dateOfBirth?: Date) => Promise<void>;
   logout: () => Promise<void>;
+  deleteUserInfo: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   refreshUserProfile: () => Promise<void>;
   /** Re-fetch session from storage; only for app-resume flow after authReady. Avoids race with initial hydration. */
@@ -30,12 +33,22 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   /** Stable flag: true only after the single initial getSession() has completed. Never set back to false. */
   const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const safeSetUserProfile = async (profile: UserProfile) => {
+  try {
+    setUserProfile(profile);
+    await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
+  } catch (error) {
+    console.warn('[AuthContext] Failed to cache user profile, continuing anyway', error);
+  }
+};
 
   useEffect(() => {
     console.log('[COLD_START] AuthProvider mounting...');
@@ -48,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select('*, is_admin')
         .eq('id', userId)
         .single();
       
@@ -62,9 +75,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           firstName: data.first_name,
           dateOfBirth: data.date_of_birth || undefined,
           created_at: data.created_at,
+          isAdmin: data.is_admin,
         };
         setUserProfile(profile);
-        await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
+        // await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
+        await safeSetUserProfile(profile);
       }
     } catch (error) {
       // Silent error - will retry on next auth state change
@@ -74,98 +89,98 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Single source of truth: only place that calls getSession() for initial hydration.
   // No timeout—avoids race where we'd show "logged out" before storage has finished loading.
-  useEffect(() => {
-    let mounted = true;
+useEffect(() => {
+  let mounted = true;
 
-    const initializeAuth = async () => {
-      console.log('[COLD_START] AuthContext: Starting initialization');
-      const initStartTime = Date.now();
+  const initializeAuth = async () => {
+    console.log('[COLD_START] AuthContext: Starting initialization');
 
+    let session = null;
+    let cachedProfile: string | null = null;
+
+  try {
+    cachedProfile = await AsyncStorage.getItem('userProfile');
+    console.log('[COLD_START] AsyncStorage userProfile read complete');
+  } catch (e) {
+    console.error('[COLD_START] AsyncStorage failed:', e);
+  }
+
+  try {
+    const sessionResult = await supabase.auth.getSession();
+    session = sessionResult.data.session;
+    
+    console.log('[COLD_START] getSession complete');
+  } catch (e) {
+    console.error('[COLD_START] getSession failed:', e);
+  }
+
+    if (mounted) {
       try {
-        console.log('[COLD_START] AuthContext: Getting session + cached profile in parallel...');
-        const [sessionResult, cachedProfile] = await Promise.all([
-          supabase.auth.getSession(),
-          AsyncStorage.getItem('userProfile').catch(() => null),
-        ]);
-
-        if (!mounted) {
-          console.log('[COLD_START] AuthContext: Component unmounted during init');
-          return;
-        }
-
-        const { data: { session }, error } = sessionResult;
-        const initDuration = Date.now() - initStartTime;
-        console.log(`[COLD_START] AuthContext: Session retrieved in ${initDuration}ms (has session: ${!!session})`);
-
-        if (error) {
-          console.error('[COLD_START] Error getting session:', error);
-          setUser(null);
-          setUserProfile(null);
-          setLoading(false);
-          setAuthReady(true);
-          return;
-        }
-
         if (session?.user) {
           setUser(session.user);
+
           if (cachedProfile) {
             try {
               setUserProfile(JSON.parse(cachedProfile));
-            } catch (e) {
-              // Invalid cache, fetch fresh
+            } catch {
+              console.warn('[COLD_START] Invalid cached profile, fetching fresh...');
             }
           }
-          console.log('[COLD_START] AuthContext: User set, fetching profile in background...');
+
+          // Fetch profile in background
           if (typeof requestIdleCallback !== 'undefined') {
-            requestIdleCallback(() => {
-              fetchUserProfile(session.user.id);
-            });
+            requestIdleCallback(() => fetchUserProfile(session.user.id));
           } else {
-            setTimeout(() => {
-              fetchUserProfile(session.user.id);
-            }, 0);
+            setTimeout(() => fetchUserProfile(session.user.id), 0);
           }
-        } else {
-          setUser(null);
-          setUserProfile(null);
-          console.log('[COLD_START] AuthContext: No session found');
-        }
+        } 
       } catch (error) {
-        console.error('[COLD_START] Error initializing auth:', error);
-        if (mounted) {
-          setUser(null);
-          setUserProfile(null);
-        }
-      } finally {
-        if (mounted) {
-          const totalDuration = Date.now() - initStartTime;
-          console.log(`[COLD_START] AuthContext: authReady set (total init: ${totalDuration}ms)`);
-          setLoading(false);
-          setAuthReady(true);
-        }
-      }
-    };
-
-    initializeAuth();
-
-    // Listener only updates user/profile. Does NOT set loading or authReady—prevents race where
-    // listener fires before getSession() completes and would mark "ready" prematurely.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-      if (session?.user) {
-        setUser(session.user);
-        await fetchUserProfile(session.user.id);
-      } else {
+        console.error('[COLD_START] Error setting user/profile:', error);
         setUser(null);
         setUserProfile(null);
       }
-    });
+    }
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
+    if (mounted) {
+      setLoading(false);
+      setAuthReady(true);
+      console.log('[COLD_START] authReady true');
+    } else {
+      console.log('[COLD_START] Auth init finished after unmount; skipping setAuthReady');
+    }
+  };
+
+  initializeAuth();
+
+  const hasInitializedRef = { current: false };
+
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+
+      // Skip duplicate handling of the initial session event (getSession is the source of truth for hydration).
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      console.log('[COLD_START] Skipping initial onAuthStateChange event:', _event);
+      return;
+    }
+
+    console.log('[COLD_START] onAuthStateChange event:', _event);
+
+
+    if (session?.user) {
+      setUser(session.user);
+      await fetchUserProfile(session.user.id);
+    } else {
+      setUser(null);
+      setUserProfile(null);
+    }
+  });
+
+  return () => {
+    mounted = false;
+    subscription.unsubscribe();
+  };
+}, []);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -303,6 +318,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+const deleteUserInfo = async () => {
+  console.log('*****deleteUserInfo called');
+  try {
+    console.log('supabaseUrl:', `${supabaseUrl}/functions/v1/delete-account`) // is this a valid URL?
+
+    const { data: { session } } = await supabase.auth.getSession()
+    console.log('token exists:', !!session?.access_token)
+    if (!session) {
+      alert("No active session")
+      return
+    }
+
+    console.log('Initiating account deletion for user:', session.user.id, 'at url:', `${supabaseUrl}/functions/v1/delete-account`);
+
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/delete-account`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      }
+    )
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to delete account")
+    }
+
+    await supabase.auth.signOut()
+
+    // navigate to login screen
+    router.replace("/login")
+
+  } catch (error) {
+    console.error("Delete account error:", error)
+    alert("Failed to delete account")
+  }
+}
+
+
   const resetPassword = async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -335,7 +392,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userProfile, authReady, loading, signIn, signUp, logout, resetPassword, refreshUserProfile, refreshSession }}>
+    <AuthContext.Provider value={{ user, userProfile, authReady, loading, signIn, signUp, logout, deleteUserInfo, resetPassword, refreshUserProfile, refreshSession }}>
       {children}
     </AuthContext.Provider>
   );

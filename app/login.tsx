@@ -69,10 +69,7 @@ export default function LoginScreen() {
       }
 
       // Date of birth validation
-      if (!dateOfBirth) {
-        newErrors.dateOfBirth = 'Date of birth is required';
-        isValid = false;
-      } else {
+      if (dateOfBirth) {
         // Check if date is in the future
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -132,13 +129,8 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      if (isSignUp) {
-        if (!dateOfBirth) {
-          Alert.alert('Error', 'Please select your date of birth');
-          setLoading(false);
-          return;
-        }
-        await signUp(email, password, firstName, dateOfBirth);
+      if (isSignUp) {       
+        await signUp(email, password, firstName, dateOfBirth || undefined);
         Alert.alert('Success', 'Account created successfully!');
         router.replace('/(tabs)/dashboard');
       } else {

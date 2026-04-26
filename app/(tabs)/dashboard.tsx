@@ -141,8 +141,14 @@ export default function DashboardScreen() {
           <View style={styles.topHeader}>
             <View style={styles.greetingContainer}>
               <Text style={[styles.greeting, { color: colors.text }]}>
-                {greeting}, {userProfile?.firstName || 'there'}
-              </Text>
+              {greeting}, {userProfile?.firstName || 'there'}{' '}
+              
+              {userProfile?.isAdmin ? (
+                <Text style={styles.adminTag}>(admin)</Text>
+              ) : (
+                <Text style={styles.betaTag}>(beta)</Text>
+              )}
+            </Text>
               <Text style={[styles.dateText, { color: colors.secondary }]}>
                 {formattedDate}
               </Text>
@@ -225,6 +231,18 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 4,
+  },  
+  adminTag: {
+  fontSize: 10,        
+  color: 'red',
+  marginLeft: 4,       
+  fontWeight: '600',
+  },
+  betaTag: {
+  fontSize: 10,        
+  color: 'blue',
+  marginLeft: 4,       
+  fontWeight: '600',
   },
   dateText: {
     fontSize: 14,
