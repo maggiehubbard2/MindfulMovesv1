@@ -3,8 +3,17 @@ import { useTheme } from '@/context/ThemeContext';
 import { Quote, quotes } from '@/data/quotes';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import React, { useRef, useState } from 'react';
-import { Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  Animated,
+  Dimensions,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 // Dynamically import sharing modules with error handling
 let Sharing: any = null;
@@ -23,111 +32,132 @@ try {
   console.warn('react-native-view-shot not available:', error);
 }
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 interface ShareStreakScreenProps {
   visible: boolean;
   onClose: () => void;
+  /**
+   * The days of the week to show in the calendar strip.
+   * Pass the last 7 days with a boolean indicating if the user completed habits that day.
+   * Defaults to showing the last 5 days as completed if not provided.
+   */
+  weekData?: { label: string; completed: boolean }[];
 }
 
 /**
  * ShareStreakScreen - Celebrates user's longest habit streak and enables sharing
- * 
- * Design Philosophy:
- * - Duolingo-inspired: clean, celebratory, share-worthy
- * - Prominent streak number as hero element
- * - Motivational quote for emotional resonance
- * - Uses user's theme colors for personalization
- * - Minimal branding to keep focus on achievement
- * - Optional sharing - no pressure, just celebration
- * 
- * Architecture:
- * - Uses view-to-image capture for share asset generation
- * - System share sheet for maximum compatibility
- * - Pure component - no side effects on mount/unmount
- * 
- * Usage Example:
- * ```tsx
- * const [showShareScreen, setShowShareScreen] = useState(false);
- * 
- * // Trigger after habit completion or milestone
- * const handleHabitComplete = () => {
- *   const streak = calculateLongestStreak();
- *   if (streak > 0 && streak % 7 === 0) { // Show every 7 days
- *     setShowShareScreen(true);
- *   }
- * };
- * 
- * <ShareStreakScreen
- *   visible={showShareScreen}
- *   onClose={() => setShowShareScreen(false)}
- * />
- * ```
- * 
- * Required Dependencies:
- * - expo-sharing: System share sheet
- * - react-native-view-shot: View-to-image capture
- * 
- * Install with: npm install expo-sharing react-native-view-shot
+ *
+ * Redesigned to be a full-screen 9:16 story-format share screen, inspired by
+ * Duolingo's streak celebration UI. Key improvements:
+ * - Full portrait (9:16) format for Instagram Stories
+ * - Animated entrance for the streak number
+ * - Weekly calendar strip showing recent consistency
+ * - Motivational quote from the user's quote bank
+ * - Dramatic typography and generous spacing
  */
-export default function ShareStreakScreen({ visible, onClose }: ShareStreakScreenProps) {
+export default function ShareStreakScreen({
+  visible,
+  onClose,
+  weekData,
+}: ShareStreakScreenProps) {
   const { calculateLongestStreak } = useHabits();
   const { colors } = useTheme();
   const [isGenerating, setIsGenerating] = useState(false);
   const shareViewRef = useRef<View>(null);
 
+  // Animation values
+  const numberScale = useRef(new Animated.Value(0.5)).current;
+  const numberOpacity = useRef(new Animated.Value(0)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const buttonOpacity = useRef(new Animated.Value(0)).current;
+
   const streak = calculateLongestStreak();
 
-  // Don't show if streak is 0 - no achievement to celebrate
-  if (!visible || streak === 0) {
-    return null;
-  }
+  // Default week data: show last 7 days with last 5 completed
+  const defaultWeekData = [
+    { label: 'Mo', completed: true },
+    { label: 'Tu', completed: true },
+    { label: 'We', completed: true },
+    { label: 'Th', completed: true },
+    { label: 'Fr', completed: true },
+    { label: 'Sa', completed: false },
+    { label: 'Su', completed: false },
+  ];
+  const days = weekData ?? defaultWeekData;
+
+  useEffect(() => {
+    if (visible) {
+      // Reset animations
+      numberScale.setValue(0.5);
+      numberOpacity.setValue(0);
+      contentOpacity.setValue(0);
+      buttonOpacity.setValue(0);
+
+      // Sequence: number pops in first, then content fades, then button
+      Animated.sequence([
+        Animated.delay(200),
+        Animated.parallel([
+          Animated.spring(numberScale, {
+            toValue: 1,
+            tension: 60,
+            friction: 7,
+            useNativeDriver: true,
+          }),
+          Animated.timing(numberOpacity, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.timing(contentOpacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(buttonOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  if (!visible || streak === 0) return null;
 
   /**
-   * Selects a motivational quote that pairs well with streak achievements
-   * Prefers quotes about consistency, habits, and progress
-   * Falls back to random selection if no specific matches
+   * Picks a quote that resonates with streak/consistency themes.
+   * Uses the streak count as a seed for deterministic selection per milestone.
    */
   const getStreakQuote = (): Quote => {
-    // Filter for quotes that resonate with streak/consistency themes
-    const streakThemedQuotes = quotes.filter(q => {
-      const text = q.text.toLowerCase();
+    const streakThemed = quotes.filter((q) => {
+      const t = q.text.toLowerCase();
       return (
-        text.includes('habit') ||
-        text.includes('repeated') ||
-        text.includes('consist') ||
-        text.includes('day') ||
-        text.includes('effort') ||
-        text.includes('small') ||
-        text.includes('compound')
+        t.includes('habit') ||
+        t.includes('repeated') ||
+        t.includes('consist') ||
+        t.includes('day') ||
+        t.includes('effort') ||
+        t.includes('small') ||
+        t.includes('compound') ||
+        t.includes('sum')
       );
     });
-    
-    // Use streak-themed quotes if available, otherwise use all quotes
-    const quotePool = streakThemedQuotes.length > 0 ? streakThemedQuotes : quotes;
-    const randomIndex = Math.floor(Math.random() * quotePool.length);
-   // return quotePool[randomIndex];
-    return quotes[randomIndex];
+    const pool = streakThemed.length > 0 ? streakThemed : quotes;
+    // Use streak as a deterministic seed so the quote stays stable for a given milestone
+    return pool[streak % pool.length];
   };
 
   const selectedQuote = getStreakQuote();
 
-  /**
-   * Generates a shareable image from the share view
-   * 
-   * Creates a high-quality PNG suitable for social sharing
-   * Uses square format (1:1) for maximum compatibility across platforms
-   * Instagram Stories, regular posts, Twitter, etc. all support square images
-   * 
-   * @returns Promise<string | null> - File URI of generated image, or null on error
-   */
   const createStreakShareImage = async (): Promise<string | null> => {
-    if (!shareViewRef.current) {
-      return null;
-    }
+    if (!shareViewRef.current) return null;
 
     if (!captureRef) {
       Alert.alert(
         'Package Required',
-        'react-native-view-shot is required for sharing. Please install it with: npm install react-native-view-shot',
+        'react-native-view-shot is required for sharing. Install with: npm install react-native-view-shot',
         [{ text: 'OK' }]
       );
       return null;
@@ -135,45 +165,28 @@ export default function ShareStreakScreen({ visible, onClose }: ShareStreakScree
 
     try {
       setIsGenerating(true);
-
-      // Capture the view as a high-quality PNG
-      // Square format (1080x1080) works well for most social platforms
-      // Instagram Stories can crop square images, regular posts use them as-is
       const uri = await captureRef(shareViewRef.current, {
         format: 'png',
         quality: 1.0,
         result: 'tmpfile',
-        // Square format for maximum compatibility
         width: 1080,
-        height: 1080,
+        height: 1920, // 9:16 portrait for Instagram Stories
       });
-
       return uri;
     } catch (error) {
       console.error('Error generating share image:', error);
-      Alert.alert(
-        'Error',
-        'Failed to generate share image. Please try again.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Error', 'Failed to generate share image. Please try again.', [{ text: 'OK' }]);
       return null;
     } finally {
       setIsGenerating(false);
     }
   };
 
-  /**
-   * Shares the streak image using the system share sheet
-   * 
-   * Uses Expo Sharing API which opens the native share sheet
-   * Users can choose from available apps (Instagram, Twitter, Messages, etc.)
-   * Gracefully handles cancellation and errors
-   */
   const handleShare = async () => {
     if (!Sharing) {
       Alert.alert(
         'Package Required',
-        'expo-sharing is required for sharing. Please install it with: npm install expo-sharing',
+        'expo-sharing is required. Install with: npm install expo-sharing',
         [{ text: 'OK' }]
       );
       return;
@@ -181,151 +194,147 @@ export default function ShareStreakScreen({ visible, onClose }: ShareStreakScree
 
     try {
       const imageUri = await createStreakShareImage();
-      
-      if (!imageUri) {
-        return;
-      }
+      if (!imageUri) return;
 
-      // Check if sharing is available on this device
       const isAvailable = await Sharing.isAvailableAsync();
-      
       if (!isAvailable) {
-        Alert.alert(
-          'Sharing Not Available',
-          'Sharing is not available on this device.',
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Sharing Not Available', 'Sharing is not available on this device.', [
+          { text: 'OK' },
+        ]);
         return;
       }
 
-      // Open system share sheet
-      // Users can choose their preferred app (Instagram, Twitter, Messages, etc.)
       await Sharing.shareAsync(imageUri, {
         mimeType: 'image/png',
-        dialogTitle: 'Share your streak! 🎉',
+        dialogTitle: 'Share your streak! 🔥',
         UTI: 'public.png',
       });
 
-      // Close modal after sharing (user may have cancelled, but that's fine)
-      // We don't force them to stay on the screen
       onClose();
     } catch (error: any) {
-      // Handle user cancellation gracefully
       if (error?.code === 'E_SHARING_CANCELLED' || error?.message?.includes('cancel')) {
-        // User cancelled - that's fine, just close silently
         onClose();
         return;
       }
-
       console.error('Error sharing streak:', error);
-      Alert.alert(
-        'Share Failed',
-        'Unable to share. Please try again.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Share Failed', 'Unable to share. Please try again.', [{ text: 'OK' }]);
     }
   };
 
+  const isDark = colors.background === '#000000' || colors.background === '#0a0a0a';
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <StatusBar style={colors.background === '#000000' ? 'light' : 'dark'} />
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <View style={styles.modalOverlay}>
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
-          {/* Close Button */}
+        {/* ── Shareable content area (9:16) ── */}
+        <View
+          ref={shareViewRef}
+          collapsable={false}
+          style={[styles.shareView, { backgroundColor: colors.background }]}
+        >
+          {/* Subtle top-right accent blob */}
+          <View
+            style={[styles.accentBlob, { backgroundColor: colors.primary + '18' }]}
+          />
+
+          {/* ── Streak number hero ── */}
+          <Animated.View
+            style={[
+              styles.heroSection,
+              { opacity: numberOpacity, transform: [{ scale: numberScale }] },
+            ]}
+          >
+            {/* Fire emoji — big and unapologetic */}
+            <Text style={styles.fireEmoji}>🔥</Text>
+
+            <Text style={[styles.streakNumber, { color: colors.primary }]}>
+              {streak}
+            </Text>
+            <Text style={[styles.streakLabel, { color: colors.text }]}>
+              Day{streak !== 1 ? 's' : ''} Streak
+            </Text>
+          </Animated.View>
+
+          {/* ── Weekly calendar strip ── */}
+          <Animated.View style={[styles.calendarSection, { opacity: contentOpacity }]}>
+            <View style={styles.calendarRow}>
+              {days.map((day, i) => (
+                <View key={i} style={styles.dayColumn}>
+                  <Text style={[styles.dayLabel, { color: colors.secondary }]}>
+                    {day.label}
+                  </Text>
+                  <View
+                    style={[
+                      styles.dayPill,
+                      day.completed
+                        ? { backgroundColor: colors.primary }
+                        : { backgroundColor: colors.card ?? colors.secondary + '22' },
+                    ]}
+                  >
+                    {day.completed && (
+                      <Ionicons name="checkmark" size={14} color="white" />
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </Animated.View>
+
+          {/* ── Motivational quote ── */}
+          <Animated.View style={[styles.quoteSection, { opacity: contentOpacity }]}>
+            <Text style={[styles.quoteText, { color: colors.text }]}>
+              "{selectedQuote.text}"
+            </Text>
+            <Text style={[styles.quoteAuthor, { color: colors.secondary }]}>
+              — {selectedQuote.author}
+            </Text>
+          </Animated.View>
+
+          {/* ── Branding footer ── */}
+          <Animated.View style={[styles.brandingRow, { opacity: contentOpacity }]}>
+            <View style={[styles.brandDot, { backgroundColor: colors.primary }]} />
+            <Text style={[styles.brandingText, { color: colors.secondary }]}>
+              Mindful Moves
+            </Text>
+          </Animated.View>
+        </View>
+
+        {/* ── Buttons (outside shareable area) ── */}
+        <Animated.View
+          style={[
+            styles.actionsContainer,
+            { backgroundColor: colors.background, opacity: buttonOpacity },
+          ]}
+        >
+          {/* Close button top-right */}
           <TouchableOpacity
-            style={[styles.closeButton, { backgroundColor: colors.card }]}
+            style={[styles.closeButton, { backgroundColor: colors.card ?? colors.secondary + '22' }]}
             onPress={onClose}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="close" size={24} color={colors.text} />
+            <Ionicons name="close" size={20} color={colors.text} />
           </TouchableOpacity>
 
-          {/* Share View - This will be captured as an image */}
-          <View
-            ref={shareViewRef}
+          <TouchableOpacity
             style={[
-              styles.shareView,
-              {
-                backgroundColor: colors.background,
-                // Square format for maximum social media compatibility
-                aspectRatio: 1,
-              },
+              styles.shareButton,
+              { backgroundColor: colors.primary, opacity: isGenerating ? 0.6 : 1 },
             ]}
-            collapsable={false}
+            onPress={handleShare}
+            disabled={isGenerating}
+            activeOpacity={0.85}
           >
-            {/* Subtle gradient overlay using primary color */}
-            <View
-              style={[
-                styles.gradientOverlay,
-                { backgroundColor: colors.primary + '10' }, // ~6% opacity
-              ]}
-            />
+            <Ionicons name="share-outline" size={20} color="white" />
+            <Text style={styles.shareButtonText}>
+              {isGenerating ? 'Generating…' : 'Share Your Streak'}
+            </Text>
+          </TouchableOpacity>
 
-            {/* Main Content */}
-            <View style={styles.content}>
-              {/* Streak Number - Hero Element */}
-              <View style={styles.streakContainer}>
-                <Text style={[styles.streakNumber, { color: colors.primary }]}>
-                  {streak}
-                </Text>
-                <Text style={[styles.streakLabel, { color: colors.text }]}>
-                  Day{streak !== 1 ? 's' : ''} Streak
-                </Text>
-              </View>
-
-              {/* Quote Section */}
-              <View style={styles.quoteContainer}>
-                <Text style={[styles.quoteText, { color: colors.text }]}>
-                  "{selectedQuote.text}"
-                </Text>
-                <Text style={[styles.quoteAuthor, { color: colors.secondary }]}>
-                  — {selectedQuote.author}
-                </Text>
-              </View>
-
-              {/* Branding - Subtle footer */}
-              <View style={styles.brandingContainer}>
-                <Text style={[styles.brandingText, { color: colors.secondary }]}>
-                  Mindful Moves
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Action Buttons */}
-          <View style={styles.actionsContainer}>
-            <TouchableOpacity
-              style={[
-                styles.shareButton,
-                {
-                  backgroundColor: colors.primary,
-                  opacity: isGenerating ? 0.6 : 1,
-                },
-              ]}
-              onPress={handleShare}
-              disabled={isGenerating}
-            >
-              <Ionicons name="share-outline" size={22} color="white" />
-              <Text style={styles.shareButtonText}>
-                {isGenerating ? 'Generating...' : 'Share Your Streak'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.cancelButton, { borderColor: colors.border }]}
-              onPress={onClose}
-            >
-              <Text style={[styles.cancelButtonText, { color: colors.text }]}>
-                Maybe Later
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+          <TouchableOpacity onPress={onClose} style={styles.laterButton}>
+            <Text style={[styles.laterText, { color: colors.secondary }]}>Maybe Later</Text>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -334,124 +343,161 @@ export default function ShareStreakScreen({ visible, onClose }: ShareStreakScree
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    backgroundColor: '#000',
+    justifyContent: 'flex-end',
   },
-  container: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: 24,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 16,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    zIndex: 10,
-    padding: 8,
-    borderRadius: 20,
-  },
+
+  // ── Share view: fills most of the screen in 9:16 proportion ──
   shareView: {
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 50,
-    position: 'relative',
-  },
-  gradientOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  content: {
     flex: 1,
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    width: '100%',
-    zIndex: 1,
+    paddingTop: 80,
+    paddingBottom: 48,
+    paddingHorizontal: 32,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  streakContainer: {
+
+  accentBlob: {
+    position: 'absolute',
+    top: -80,
+    right: -80,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+  },
+
+  // ── Hero: fire + number + label ──
+  heroSection: {
     alignItems: 'center',
-    marginTop: 40,
+    marginTop: 20,
+  },
+  fireEmoji: {
+    fontSize: 72,
+    marginBottom: 8,
   },
   streakNumber: {
-    fontSize: 100,
-    fontWeight: 'bold',
-    lineHeight: 120,
-    letterSpacing: -2,
+    fontSize: 130,
+    fontWeight: '800',
+    lineHeight: 140,
+    letterSpacing: -4,
+    includeFontPadding: false,
   },
   streakLabel: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '600',
-    marginTop: 8,
     letterSpacing: 0.5,
+    marginTop: 4,
   },
-  quoteContainer: {
+
+  // ── Weekly calendar strip ──
+  calendarSection: {
+    width: '100%',
     alignItems: 'center',
-    paddingHorizontal: 40,
-    marginVertical: 30,
-    flex: 1,
+  },
+  calendarRow: {
+    flexDirection: 'row',
+    gap: 10,
     justifyContent: 'center',
   },
-  quoteText: {
-    fontSize: 20,
+  dayColumn: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  dayLabel: {
+    fontSize: 12,
     fontWeight: '500',
-    textAlign: 'center',
-    lineHeight: 30,
+    letterSpacing: 0.3,
+  },
+  dayPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── Quote ──
+  quoteSection: {
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    gap: 10,
+  },
+  quoteText: {
+    fontSize: 17,
+    fontWeight: '400',
     fontStyle: 'italic',
-    marginBottom: 12,
+    textAlign: 'center',
+    lineHeight: 26,
+    opacity: 0.9,
   },
   quoteAuthor: {
-    fontSize: 15,
-    fontWeight: '400',
+    fontSize: 13,
+    fontWeight: '500',
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
-  brandingContainer: {
-    marginBottom: 30,
+
+  // ── Branding ──
+  brandingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  brandDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   brandingText: {
     fontSize: 13,
     fontWeight: '500',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     opacity: 0.5,
+    textTransform: 'uppercase',
   },
+
+  // ── Buttons (outside shareable area) ──
   actionsContainer: {
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 40,
     gap: 12,
+    position: 'relative',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 16,
+    right: 24,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
   shareButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingVertical: 17,
     borderRadius: 16,
     gap: 10,
+    marginTop: 8,
   },
   shareButtonText: {
     color: 'white',
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
-  cancelButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    borderWidth: 1,
+  laterButton: {
     alignItems: 'center',
+    paddingVertical: 10,
   },
-  cancelButtonText: {
+  laterText: {
     fontSize: 15,
     fontWeight: '500',
   },
 });
-
