@@ -46,7 +46,7 @@ interface ShareStreakScreenProps {
 }
 
 /**
- * ShareStreakScreen - Celebrates user's longest habit streak and enables sharing
+ * ShareStreakScreen - Celebrates user's current habit streak and enables sharing
  *
  * Redesigned to be a full-screen 9:16 story-format share screen, inspired by
  * Duolingo's streak celebration UI. Key improvements:
@@ -61,7 +61,7 @@ export default function ShareStreakScreen({
   onClose,
   weekData,
 }: ShareStreakScreenProps) {
-  const { calculateLongestStreak } = useHabits();
+  const { calculateCurrentStreak } = useHabits();
   const { colors } = useTheme();
   const [isGenerating, setIsGenerating] = useState(false);
   const shareViewRef = useRef<View>(null);
@@ -72,7 +72,7 @@ export default function ShareStreakScreen({
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const buttonOpacity = useRef(new Animated.Value(0)).current;
 
-  const streak = calculateLongestStreak();
+  const streak = calculateCurrentStreak();
 
   // Default week data: show last 7 days with last 5 completed
   const defaultWeekData = [
