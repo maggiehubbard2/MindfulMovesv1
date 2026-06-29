@@ -28,6 +28,7 @@ interface HabitsContextType {
   canEditDate: (date: Date) => boolean;
   resetHabitsForNewDay: () => Promise<void>;
   calculateLongestStreak: () => number;
+  calculateCurrentStreak: () => number;
   refresh: () => Promise<void>; // Refresh habits from Supabase
 }
 
@@ -49,6 +50,25 @@ const normalizeDateToDay = (dateStr: string): string => {
   return `${year}-${month}-${day}`;
 };
 
+const formatLocalDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const collectActiveCompletionDays = (habits: Habit[]): Set<string> => {
+  const activeDays = new Set<string>();
+  habits.forEach((habit) => {
+    (habit.completionDates || []).forEach((dateStr) => {
+      if (dateStr && typeof dateStr === 'string') {
+        activeDays.add(normalizeDateToDay(dateStr));
+      }
+    });
+  });
+  return activeDays;
+};
+
 /**
  * Calculates the longest consecutive streak of days where at least one habit was completed.
  * 
@@ -68,19 +88,7 @@ const calculateLongestStreak = (habits: Habit[]): number => {
   }
 
   // Step 1: Collect all completion dates from all habits
-  // Use Set to automatically deduplicate dates
-  const allCompletionDates = new Set<string>();
-  
-  habits.forEach(habit => {
-    const completionDates = habit.completionDates || [];
-    completionDates.forEach(dateStr => {
-      if (dateStr && typeof dateStr === 'string') {
-        // Normalize to day boundary and add to set (automatically deduplicates)
-        const normalizedDate = normalizeDateToDay(dateStr);
-        allCompletionDates.add(normalizedDate);
-      }
-    });
-  });
+  const allCompletionDates = collectActiveCompletionDays(habits);
 
   // Step 2: Convert set to sorted array (already deduplicated by Set)
   const uniqueDates = Array.from(allCompletionDates).sort();
@@ -117,15 +125,52 @@ const calculateLongestStreak = (habits: Habit[]): number => {
   return longestStreak;
 };
 
+/**
+ * Active global streak: consecutive days (ending today or yesterday) where at least
+ * one habit was completed. Breaks on any calendar day with zero completions.
+ * If today has no completions yet, yesterday still counts (grace until end of day).
+ */
+const calculateCurrentStreak = (habits: Habit[]): number => {
+  if (!habits || habits.length === 0) {
+    return 0;
+  }
+
+  const activeDays = collectActiveCompletionDays(habits);
+  if (activeDays.size === 0) {
+    return 0;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let cursor = new Date(today);
+
+  if (!activeDays.has(formatLocalDate(today))) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  let streak = 0;
+  for (let i = 0; i < 365; i++) {
+    const dateStr = formatLocalDate(cursor);
+    if (activeDays.has(dateStr)) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+};
+
 export function HabitsProvider({ children }: { children: React.ReactNode }) {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const { user } = useAuth();
   const hasHydratedRef = React.useRef(false);
 
-  // Write widget data whenever habits change
+  // Write widget data whenever habits change (including empty state for widget)
   useEffect(() => {
-    if (user && habits.length > 0) {
+    if (user) {
       // Defer widget write to not block UI
       const writeWidget = () => {
         writeWidgetData(habits).catch(() => {
@@ -671,6 +716,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
 
   // Calculate longest streak - memoized to avoid recalculating on every render
   const longestStreak = React.useMemo(() => calculateLongestStreak(habits), [habits]);
+  const currentStreak = React.useMemo(() => calculateCurrentStreak(habits), [habits]);
 
   // Refresh method for soft refresh system
   // Safe to call multiple times - idempotent
@@ -694,6 +740,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       canEditDate,
       resetHabitsForNewDay,
       calculateLongestStreak: () => longestStreak,
+      calculateCurrentStreak: () => currentStreak,
       refresh,
     }}>
       {children}

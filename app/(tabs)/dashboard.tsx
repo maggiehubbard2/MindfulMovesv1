@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function DashboardScreen() {
   const { colors, isDarkMode } = useTheme();
   const { userProfile, refreshUserProfile, loading } = useAuth();
-  const { setSelectedDate, getHabitsForDate, selectedDate, habits, calculateLongestStreak, refresh } = useHabits();
+  const { setSelectedDate, getHabitsForDate, selectedDate, habits, calculateCurrentStreak, refresh } = useHabits();
   const [showConfetti, setShowConfetti] = useState(false);
   const [showShareScreen, setShowShareScreen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,7 +47,7 @@ export default function DashboardScreen() {
       setShowConfetti(true);
       setTimeout(() => {
         setShowConfetti(false);
-        if (calculateLongestStreak() > 0) setShowShareScreen(true);
+        if (calculateCurrentStreak() > 0) setShowShareScreen(true);
       }, 3000);
     } else {
       setShowConfetti(false);
