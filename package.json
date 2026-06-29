@@ -20,6 +20,7 @@
     "@supabase/supabase-js": "^2.87.1",
     "emoji-mart-native": "^0.6.5-beta",
     "expo": "~53.0.23",
+    "expo-asset": "~11.1.7",
     "expo-blur": "~14.1.5",
     "expo-constants": "~17.1.6",
     "expo-dev-client": "~5.2.4",
