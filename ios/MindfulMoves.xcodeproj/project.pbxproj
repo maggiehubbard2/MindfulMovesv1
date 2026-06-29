@@ -11,12 +11,12 @@
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		880D9F60C5E4DBB1F235E12C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 495E6EC84F4D85146B8100BE /* PrivacyInfo.xcprivacy */; };
 		95E10AD5DBA216BB6353C31F /* libPods-MindfulMoves.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D7562DCFD16B52CE571A939 /* libPods-MindfulMoves.a */; };
-		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		D5F29DF513E6BD7DC40F9BBC /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64139CC7CE482A9B83174612 /* ExpoModulesProvider.swift */; };
-		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 		9F1285CC2F16E40600EB3B89 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9F1285CB2F16E40600EB3B89 /* WidgetKit.framework */; };
 		9F1285CE2F16E40600EB3B89 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9F1285CD2F16E40600EB3B89 /* SwiftUI.framework */; };
 		9F1285DF2F16E40800EB3B89 /* MindfulMovesWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9F1285CA2F16E40600EB3B89 /* MindfulMovesWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		D5F29DF513E6BD7DC40F9BBC /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64139CC7CE482A9B83174612 /* ExpoModulesProvider.swift */; };
+		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 		WD01A1B2C3D4E5F600000001 /* WidgetDataModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = WD01A1B2C3D4E5F600000011 /* WidgetDataModule.swift */; };
 		WD01A1B2C3D4E5F600000002 /* WidgetDataModule.m in Sources */ = {isa = PBXBuildFile; fileRef = WD01A1B2C3D4E5F600000012 /* WidgetDataModule.m */; };
 /* End PBXBuildFile section */
@@ -54,14 +54,14 @@
 		64139CC7CE482A9B83174612 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-MindfulMoves/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		65DD6E44C346EAD653827954 /* Pods-MindfulMoves.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-MindfulMoves.debug.xcconfig"; path = "Target Support Files/Pods-MindfulMoves/Pods-MindfulMoves.debug.xcconfig"; sourceTree = "<group>"; };
 		8D7562DCFD16B52CE571A939 /* libPods-MindfulMoves.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-MindfulMoves.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		9F1285CA2F16E40600EB3B89 /* MindfulMovesWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MindfulMovesWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		9F1285CB2F16E40600EB3B89 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		9F1285CD2F16E40600EB3B89 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = MindfulMoves/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = MindfulMoves/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* MindfulMoves-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "MindfulMoves-Bridging-Header.h"; path = "MindfulMoves/MindfulMoves-Bridging-Header.h"; sourceTree = "<group>"; };
-		9F1285CA2F16E40600EB3B89 /* MindfulMovesWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MindfulMovesWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		9F1285CB2F16E40600EB3B89 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
-		9F1285CD2F16E40600EB3B89 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		WD01A1B2C3D4E5F600000011 /* WidgetDataModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WidgetDataModule.swift; path = MindfulMoves/WidgetDataModule.swift; sourceTree = "<group>"; };
 		WD01A1B2C3D4E5F600000012 /* WidgetDataModule.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = WidgetDataModule.m; path = MindfulMoves/WidgetDataModule.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -89,7 +89,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-
 		9F1285C72F16E40600EB3B89 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -290,7 +289,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-
 		9F1285C82F16E40600EB3B89 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -437,7 +435,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-
 		9F1285C62F16E40600EB3B89 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -454,8 +451,6 @@
 			targetProxy = 9F1285DD2F16E40800EB3B89 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
-
-
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
@@ -644,7 +639,6 @@
 			};
 			name = Release;
 		};
-
 		9F1285E12F16E40800EB3B89 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -755,7 +749,6 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-
 		9F1285E42F16E40800EB3B89 /* Build configuration list for PBXNativeTarget "MindfulMovesWidgetExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
