@@ -2,6 +2,13 @@ export interface StreakHabit {
   completionDates?: string[];
 }
 
+export interface WeekStreakDay {
+  label: string;
+  completed: boolean;
+}
+
+const WEEKDAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'] as const;
+
 const normalizeDateToDay = (dateStr: string): string => {
   const date = new Date(dateStr + 'T00:00:00');
   const year = date.getFullYear();
@@ -96,4 +103,29 @@ export const calculateCurrentStreak = (habits: StreakHabit[]): number => {
   }
 
   return streak;
+};
+
+/**
+ * Builds Mon–Sun week strip data for the current calendar week.
+ * A day is completed when at least one habit was done that day.
+ * Future days in the week are always marked incomplete.
+ */
+export const buildWeekStreakData = (habits: StreakHabit[]): WeekStreakDay[] => {
+  const activeDays = collectActiveCompletionDays(habits);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const dayOfWeek = today.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + mondayOffset);
+
+  return WEEKDAY_LABELS.map((label, index) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+    const isFuture = date > today;
+    const completed = !isFuture && activeDays.has(formatLocalDate(date));
+    return { label, completed };
+  });
 };
