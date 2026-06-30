@@ -12,5 +12,6 @@ import SwiftUI
 struct MindfulMovesWidgetBundle: WidgetBundle {
     var body: some Widget {
         HabitsWidget()
+        StreakWidget()
     }
 }
