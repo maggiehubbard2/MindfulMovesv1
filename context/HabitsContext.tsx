@@ -38,7 +38,7 @@ const HabitsContext = createContext<HabitsContextType | undefined>(undefined);
 export function HabitsProvider({ children }: { children: React.ReactNode }) {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const hasHydratedRef = React.useRef(false);
 
   // Write widget data whenever habits change (including empty state for widget)
@@ -502,25 +502,26 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     });
   }, [habits]);
 
-  // Check if a date can be edited (only up to 2 days prior, no future dates)
-  // Memoized with useMemo for the date calculation
+  // Regular users: today and up to 2 days prior. Admins: any past date (not future).
   const canEditDate = useCallback((date: Date): boolean => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const targetDate = new Date(date);
     targetDate.setHours(0, 0, 0, 0);
-    
-    // Cannot edit future dates
+
     if (targetDate > today) {
       return false;
     }
-    
-    // Can edit today and up to 2 days prior
+
+    if (userProfile?.isAdmin) {
+      return true;
+    }
+
     const twoDaysAgo = new Date(today);
     twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-    
+
     return targetDate >= twoDaysAgo;
-  }, []);
+  }, [userProfile?.isAdmin]);
 
   const removeHabit = async (id: string) => {
     try {
