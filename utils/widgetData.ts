@@ -1,6 +1,7 @@
 import { NativeModules, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Habit } from '@/context/HabitsContext';
+import { calculateCurrentStreak } from '@/utils/streak';
 
 /**
  * Shares today's habit snapshot with the iOS home screen widget via App Group.
@@ -18,6 +19,7 @@ export interface WidgetData {
   lastUpdated: string;
   totalHabits: number;
   completedCount: number;
+  currentStreak: number;
 }
 
 export async function writeWidgetData(habits: Habit[]): Promise<void> {
@@ -43,6 +45,7 @@ export async function writeWidgetData(habits: Habit[]): Promise<void> {
       lastUpdated: new Date().toISOString(),
       totalHabits: widgetHabits.length,
       completedCount: widgetHabits.filter((h) => h.completed).length,
+      currentStreak: calculateCurrentStreak(habits),
     };
 
     const widgetDataJson = JSON.stringify(widgetData);

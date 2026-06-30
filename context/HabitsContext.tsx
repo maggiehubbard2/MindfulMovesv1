@@ -1,6 +1,7 @@
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { writeWidgetData } from '@/utils/widgetData';
+import { calculateCurrentStreak, calculateLongestStreak } from '@/utils/streak';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
@@ -34,138 +35,10 @@ interface HabitsContextType {
 
 const HabitsContext = createContext<HabitsContextType | undefined>(undefined);
 
-/**
- * Normalizes a date string to local day boundary (YYYY-MM-DD format)
- * Ensures consistent date comparison regardless of timezone
- * @param dateStr - ISO date string (YYYY-MM-DD format)
- * @returns Normalized date string in YYYY-MM-DD format
- */
-const normalizeDateToDay = (dateStr: string): string => {
-  // Parse the ISO date string and normalize to local day
-  // Add T00:00:00 to ensure we're working with the start of the day
-  const date = new Date(dateStr + 'T00:00:00');
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const formatLocalDate = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const collectActiveCompletionDays = (habits: Habit[]): Set<string> => {
-  const activeDays = new Set<string>();
-  habits.forEach((habit) => {
-    (habit.completionDates || []).forEach((dateStr) => {
-      if (dateStr && typeof dateStr === 'string') {
-        activeDays.add(normalizeDateToDay(dateStr));
-      }
-    });
-  });
-  return activeDays;
-};
-
-/**
- * Calculates the longest consecutive streak of days where at least one habit was completed.
- * 
- * Algorithm:
- * 1. Collect all completion dates from all habits
- * 2. Deduplicate by calendar day (multiple habits on same day = 1 day)
- * 3. Sort dates ascending
- * 4. Walk through sorted dates and track longest consecutive run
- * 
- * @param habits - Array of habits with completionDates arrays
- * @returns Number representing the longest consecutive streak in days (0 if no streak)
- */
-const calculateLongestStreak = (habits: Habit[]): number => {
-  // Early return if no habits
-  if (!habits || habits.length === 0) {
-    return 0;
-  }
-
-  // Step 1: Collect all completion dates from all habits
-  const allCompletionDates = collectActiveCompletionDays(habits);
-
-  // Step 2: Convert set to sorted array (already deduplicated by Set)
-  const uniqueDates = Array.from(allCompletionDates).sort();
-
-  // Early return if no completion dates
-  if (uniqueDates.length === 0) {
-    return 0;
-  }
-
-  // Step 3: Find longest consecutive streak
-  // Start with at least one day if we have dates
-  let longestStreak = 1;
-  let currentStreak = 1;
-
-  // Walk through sorted dates and find consecutive runs
-  for (let i = 1; i < uniqueDates.length; i++) {
-    const currentDate = new Date(uniqueDates[i] + 'T00:00:00');
-    const previousDate = new Date(uniqueDates[i - 1] + 'T00:00:00');
-    
-    // Calculate difference in days
-    const diffTime = currentDate.getTime() - previousDate.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 1) {
-      // Consecutive day - increment current streak
-      currentStreak++;
-      longestStreak = Math.max(longestStreak, currentStreak);
-    } else {
-      // Gap found - reset current streak
-      currentStreak = 1;
-    }
-  }
-
-  return longestStreak;
-};
-
-/**
- * Active global streak: consecutive days (ending today or yesterday) where at least
- * one habit was completed. Breaks on any calendar day with zero completions.
- * If today has no completions yet, yesterday still counts (grace until end of day).
- */
-const calculateCurrentStreak = (habits: Habit[]): number => {
-  if (!habits || habits.length === 0) {
-    return 0;
-  }
-
-  const activeDays = collectActiveCompletionDays(habits);
-  if (activeDays.size === 0) {
-    return 0;
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  let cursor = new Date(today);
-
-  if (!activeDays.has(formatLocalDate(today))) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  let streak = 0;
-  for (let i = 0; i < 365; i++) {
-    const dateStr = formatLocalDate(cursor);
-    if (activeDays.has(dateStr)) {
-      streak++;
-      cursor.setDate(cursor.getDate() - 1);
-    } else {
-      break;
-    }
-  }
-
-  return streak;
-};
-
 export function HabitsProvider({ children }: { children: React.ReactNode }) {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const hasHydratedRef = React.useRef(false);
 
   // Write widget data whenever habits change (including empty state for widget)
@@ -629,25 +502,26 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     });
   }, [habits]);
 
-  // Check if a date can be edited (only up to 2 days prior, no future dates)
-  // Memoized with useMemo for the date calculation
+  // Regular users: today and up to 2 days prior. Admins: any past date (not future).
   const canEditDate = useCallback((date: Date): boolean => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const targetDate = new Date(date);
     targetDate.setHours(0, 0, 0, 0);
-    
-    // Cannot edit future dates
+
     if (targetDate > today) {
       return false;
     }
-    
-    // Can edit today and up to 2 days prior
+
+    if (userProfile?.isAdmin) {
+      return true;
+    }
+
     const twoDaysAgo = new Date(today);
     twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-    
+
     return targetDate >= twoDaysAgo;
-  }, []);
+  }, [userProfile?.isAdmin]);
 
   const removeHabit = async (id: string) => {
     try {

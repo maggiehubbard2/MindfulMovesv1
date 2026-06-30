@@ -3,10 +3,11 @@ import { useAuth } from '@/context/AuthContext';
 import { useHabits } from '@/context/HabitsContext';
 import { ThemeContextType, useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function HabitsScreen() {
@@ -15,6 +16,7 @@ export default function HabitsScreen() {
   const { userProfile } = useAuth();
   const [showDatePicker, setShowDatePicker] = useState(false);
   
+  const isAdmin = userProfile?.isAdmin === true;
   const displayHabits = getHabitsForDate(selectedDate);
   const isEditable = canEditDate(selectedDate);
   const today = new Date();
@@ -135,7 +137,18 @@ export default function HabitsScreen() {
           <View style={[styles.warningBanner, { backgroundColor: colors.primary + '20' }]}>
             <Ionicons name="information-circle" size={16} color={colors.primary} />
             <Text style={[styles.warningText, { color: colors.text }]}>
-              You can only edit habits from today and up to 2 days prior
+              {isAdmin
+                ? 'Future dates cannot be edited'
+                : 'You can only edit habits from today and up to 2 days prior'}
+            </Text>
+          </View>
+        )}
+
+        {isAdmin && isEditable && !isToday && (
+          <View style={[styles.warningBanner, { backgroundColor: colors.primary + '20' }]}>
+            <Ionicons name="shield-checkmark" size={16} color={colors.primary} />
+            <Text style={[styles.warningText, { color: colors.text }]}>
+              Admin mode: editing habits for {getDateLabel(selectedDate)}
             </Text>
           </View>
         )}
@@ -179,45 +192,81 @@ export default function HabitsScreen() {
               </View>
               
               <View style={styles.dateOptions}>
-                {[-2, -1, 0].map(daysOffset => {
-                  const date = new Date();
-                  date.setDate(date.getDate() + daysOffset);
-                  date.setHours(0, 0, 0, 0);
-                  const isSelected = selectedDateNormalized.getTime() === date.getTime();
-                  const canEdit = canEditDate(date);
-                  
-                  return (
-                    <TouchableOpacity
-                      key={daysOffset}
-                      style={[
-                        styles.dateOption,
-                        { 
-                          backgroundColor: isSelected ? colors.primary : colors.card,
-                          borderColor: colors.border,
+                {isAdmin ? (
+                  <>
+                    <DateTimePicker
+                      value={selectedDate}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      maximumDate={today}
+                      onChange={(event, date) => {
+                        if (Platform.OS === 'android') {
+                          if (event.type === 'dismissed') {
+                            setShowDatePicker(false);
+                            return;
+                          }
+                          if (date) {
+                            setSelectedDate(date);
+                            setShowDatePicker(false);
+                          }
+                          return;
                         }
-                      ]}
-                      onPress={() => {
-                        setSelectedDate(date);
-                        setShowDatePicker(false);
+                        if (date) {
+                          setSelectedDate(date);
+                        }
                       }}
-                    >
-                      <Text style={[
-                        styles.dateOptionText,
-                        { color: isSelected ? 'white' : colors.text }
-                      ]}>
-                        {daysOffset === 0 ? 'Today' : daysOffset === -1 ? 'Yesterday' : formatDate(date)}
-                      </Text>
-                      {!canEdit && (
+                      style={styles.adminDatePicker}
+                    />
+                    {Platform.OS === 'ios' && (
+                      <TouchableOpacity
+                        style={[styles.doneButton, { backgroundColor: colors.primary }]}
+                        onPress={() => setShowDatePicker(false)}
+                      >
+                        <Text style={styles.doneButtonText}>Done</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                ) : (
+                  [-2, -1, 0].map(daysOffset => {
+                    const date = new Date();
+                    date.setDate(date.getDate() + daysOffset);
+                    date.setHours(0, 0, 0, 0);
+                    const isSelected = selectedDateNormalized.getTime() === date.getTime();
+                    const canEdit = canEditDate(date);
+
+                    return (
+                      <TouchableOpacity
+                        key={daysOffset}
+                        style={[
+                          styles.dateOption,
+                          {
+                            backgroundColor: isSelected ? colors.primary : colors.card,
+                            borderColor: colors.border,
+                          }
+                        ]}
+                        onPress={() => {
+                          setSelectedDate(date);
+                          setShowDatePicker(false);
+                        }}
+                      >
                         <Text style={[
-                          styles.dateOptionSubtext,
-                          { color: isSelected ? 'rgba(255,255,255,0.7)' : colors.secondary }
+                          styles.dateOptionText,
+                          { color: isSelected ? 'white' : colors.text }
                         ]}>
-                          View Only
+                          {daysOffset === 0 ? 'Today' : daysOffset === -1 ? 'Yesterday' : formatDate(date)}
                         </Text>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
+                        {!canEdit && (
+                          <Text style={[
+                            styles.dateOptionSubtext,
+                            { color: isSelected ? 'rgba(255,255,255,0.7)' : colors.secondary }
+                          ]}>
+                            View Only
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
               </View>
             </View>
           </View>
@@ -371,6 +420,20 @@ const styles = StyleSheet.create({
   dateOptionSubtext: {
     fontSize: 12,
     marginTop: 4,
+  },
+  adminDatePicker: {
+    width: '100%',
+  },
+  doneButton: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  doneButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

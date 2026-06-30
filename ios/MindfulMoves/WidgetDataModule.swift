@@ -26,7 +26,7 @@ class WidgetDataModule: NSObject {
       if let jsonData = data.data(using: .utf8) {
         sharedDefaults.set(jsonData, forKey: "widget_habits")
         sharedDefaults.synchronize()
-        WidgetCenter.shared.reloadTimelines(ofKind: "HabitsWidget")
+        WidgetCenter.shared.reloadAllTimelines()
         resolver(true)
       } else {
         rejecter("ENCODING_ERROR", "Failed to encode widget data", nil)

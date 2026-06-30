@@ -1,6 +1,7 @@
 import { useHabits } from '@/context/HabitsContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Quote, quotes } from '@/data/quotes';
+import { buildWeekStreakData, WeekStreakDay } from '@/utils/streak';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
@@ -38,11 +39,10 @@ interface ShareStreakScreenProps {
   visible: boolean;
   onClose: () => void;
   /**
-   * The days of the week to show in the calendar strip.
-   * Pass the last 7 days with a boolean indicating if the user completed habits that day.
-   * Defaults to showing the last 5 days as completed if not provided.
+   * Optional override for the calendar strip.
+   * Defaults to the current Mon–Sun week from habit completion data.
    */
-  weekData?: { label: string; completed: boolean }[];
+  weekData?: WeekStreakDay[];
 }
 
 /**
@@ -61,7 +61,7 @@ export default function ShareStreakScreen({
   onClose,
   weekData,
 }: ShareStreakScreenProps) {
-  const { calculateCurrentStreak } = useHabits();
+  const { habits, calculateCurrentStreak } = useHabits();
   const { colors } = useTheme();
   const [isGenerating, setIsGenerating] = useState(false);
   const shareViewRef = useRef<View>(null);
@@ -73,18 +73,10 @@ export default function ShareStreakScreen({
   const buttonOpacity = useRef(new Animated.Value(0)).current;
 
   const streak = calculateCurrentStreak();
-
-  // Default week data: show last 7 days with last 5 completed
-  const defaultWeekData = [
-    { label: 'Mo', completed: true },
-    { label: 'Tu', completed: true },
-    { label: 'We', completed: true },
-    { label: 'Th', completed: true },
-    { label: 'Fr', completed: true },
-    { label: 'Sa', completed: false },
-    { label: 'Su', completed: false },
-  ];
-  const days = weekData ?? defaultWeekData;
+  const days = React.useMemo(
+    () => weekData ?? buildWeekStreakData(habits),
+    [weekData, habits]
+  );
 
   useEffect(() => {
     if (visible) {
