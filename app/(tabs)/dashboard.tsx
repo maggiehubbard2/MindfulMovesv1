@@ -7,9 +7,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useHabits } from '@/context/HabitsContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,6 +22,12 @@ export default function DashboardScreen() {
   const [showShareScreen, setShowShareScreen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const previousAllCompletedRef = useRef<boolean | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
 
   // checkAllHabitsCompleted and useEffects must run every render (Rules of Hooks)
   const checkAllHabitsCompleted = () => {

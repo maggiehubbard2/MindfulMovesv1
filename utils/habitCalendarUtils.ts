@@ -1,4 +1,5 @@
 import { Habit } from '@/context/HabitsContext';
+import { formatLocalDate } from '@/utils/date';
 
 /**
  * Calculate completion percentage for habits on a specific date
@@ -10,7 +11,7 @@ export function getHabitCompletionForDate(habits: Habit[], date: Date): number {
     return 0;
   }
   
-  const dateStr = date.toISOString().split('T')[0];
+  const dateStr = formatLocalDate(date);
   const targetDate = new Date(date);
   targetDate.setHours(0, 0, 0, 0);
   

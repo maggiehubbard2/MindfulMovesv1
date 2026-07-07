@@ -1,8 +1,8 @@
 import { useHabits } from '@/context/HabitsContext';
 import { useTheme } from '@/context/ThemeContext';
-import { getHabitCompletionForDate } from '@/utils/habitCalendarUtils';
+import { getWeekStartSunday } from '@/utils/date';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface WeeklyCalendarProps {
@@ -11,21 +11,8 @@ interface WeeklyCalendarProps {
 
 export default function WeeklyCalendar({ onDatePress }: WeeklyCalendarProps) {
   const { colors } = useTheme();
-  const { habits, selectedDate } = useHabits();
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [currentWeekStart, setCurrentWeekStart] = useState(() => {
-    const today = new Date();
-    const day = today.getDay();
-    const diff = today.getDate() - day; // Adjust to Sunday
-    const sunday = new Date(today.setDate(diff));
-    sunday.setHours(0, 0, 0, 0);
-    return sunday;
-  });
-  
-  // Force recalculation when habits change
-  useEffect(() => {
-    setRefreshKey(prev => prev + 1);
-  }, [habits]);
+  const { selectedDate } = useHabits();
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStartSunday(new Date()));
 
   const getWeekDates = (weekStart: Date): Date[] => {
     const dates: Date[] = [];
@@ -37,114 +24,119 @@ export default function WeeklyCalendar({ onDatePress }: WeeklyCalendarProps) {
     return dates;
   };
 
+  const todayWeekStart = useMemo(() => getWeekStartSunday(new Date()), [currentWeekStart]);
+
+  const canNavigateForward = useMemo(() => {
+    const nextWeekStart = new Date(currentWeekStart);
+    nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+    return nextWeekStart.getTime() <= todayWeekStart.getTime();
+  }, [currentWeekStart, todayWeekStart]);
+
   const navigateWeek = (direction: 'prev' | 'next') => {
-    const newDate = new Date(currentWeekStart);
-    if (direction === 'prev') {
-      newDate.setDate(newDate.getDate() - 7);
-    } else {
-      newDate.setDate(newDate.getDate() + 7);
-    }
-    setCurrentWeekStart(newDate);
+    if (direction === 'next' && !canNavigateForward) return;
+
+    const newStart = new Date(currentWeekStart);
+    newStart.setDate(newStart.getDate() + (direction === 'prev' ? -7 : 7));
+    setCurrentWeekStart(getWeekStartSunday(newStart));
   };
 
   const goToCurrentWeek = () => {
-    const today = new Date();
-    const day = today.getDay();
-    const diff = today.getDate() - day;
-    const sunday = new Date(today.setDate(diff));
-    sunday.setHours(0, 0, 0, 0);
-    setCurrentWeekStart(sunday);
+    setCurrentWeekStart(getWeekStartSunday(new Date()));
   };
 
   const isToday = (date: Date) => {
     const today = new Date();
-    return date.getDate() === today.getDate() && 
-           date.getMonth() === today.getMonth() && 
-           date.getFullYear() === today.getFullYear();
+    return (
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
+    );
   };
-
-  const getCompletionPercentage = useCallback((date: Date): number => {
-    // Use the utility function which properly filters habits by creation date
-    return getHabitCompletionForDate(habits, date);
-  }, [habits, refreshKey]);
 
   const weekDates = getWeekDates(currentWeekStart);
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const dayNamesFull = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  
-  // Check if current week is displayed
-  const today = new Date();
-  const isCurrentWeek = weekDates.some(date => isToday(date));
 
   return (
     <View style={[styles.container, { backgroundColor: colors.card }]}>
-      {/* Week Navigation Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.navButton}
           onPress={() => navigateWeek('prev')}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
           <Ionicons name="chevron-back" size={20} color={colors.primary} />
         </TouchableOpacity>
-        
-        <TouchableOpacity onPress={goToCurrentWeek}>
-          <Text style={[styles.weekTitle, { color: colors.text }]}>
-            {weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {' '}
+
+        <TouchableOpacity
+          style={styles.weekTitleButton}
+          onPress={goToCurrentWeek}
+          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+        >
+          <Text style={[styles.weekTitle, { color: colors.text }]} numberOfLines={1}>
+            {weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} -{' '}
             {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.navButton}
           onPress={() => navigateWeek('next')}
+          disabled={!canNavigateForward}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
-          <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color={canNavigateForward ? colors.primary : colors.secondary}
+          />
         </TouchableOpacity>
       </View>
 
-      {/* Week Grid */}
       <View style={styles.weekGrid}>
         {weekDates.map((date, index) => {
-          const percentage = getCompletionPercentage(date);
           const isTodayDate = isToday(date);
           const isSelectedDate =
-            selectedDate &&
-            date.toDateString() === selectedDate.toDateString();
-
+            selectedDate && date.toDateString() === selectedDate.toDateString();
           const dayName = dayNames[index];
-          
+
           return (
             <TouchableOpacity
-              key={index}
+              key={`${date.toISOString()}-${index}`}
               style={styles.dayCell}
               onPress={() => onDatePress?.(date)}
               activeOpacity={0.7}
             >
-              <Text style={[
-                styles.dayName,
-                { 
-                  color: isSelectedDate ? colors.text : colors.secondary,
-                  fontWeight: isTodayDate ? 'bold' : 'normal'
-                }
-              ]}>
+              <Text
+                style={[
+                  styles.dayName,
+                  {
+                    color: isSelectedDate ? colors.text : colors.secondary,
+                    fontWeight: isTodayDate ? 'bold' : 'normal',
+                  },
+                ]}
+              >
                 {dayName}
               </Text>
-              
-              <View style={[
-                styles.dayCircle,
-                { 
-                  backgroundColor: isSelectedDate ? colors.primary : colors.card,
-                  borderColor: isTodayDate ? colors.primary : colors.border,
-                  borderWidth: isTodayDate ? 2 : 1
-                }
-              ]}>
-                <Text style={[
-                  styles.dayNumber,
-                  { 
-                    color: isTodayDate ? 'white' : colors.text,
-                    fontWeight: isTodayDate ? 'bold' : 'normal'
-                  }
-                ]}>
+
+              <View
+                style={[
+                  styles.dayCircle,
+                  {
+                    backgroundColor: isSelectedDate ? colors.primary : colors.card,
+                    borderColor: isTodayDate ? colors.primary : colors.border,
+                    borderWidth: isTodayDate ? 2 : 1,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.dayNumber,
+                    {
+                      color: isSelectedDate ? 'white' : isTodayDate ? colors.primary : colors.text,
+                      fontWeight: isTodayDate ? 'bold' : 'normal',
+                    },
+                  ]}
+                >
                   {date.getDate()}
                 </Text>
               </View>
@@ -173,13 +165,21 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
     paddingHorizontal: 4,
   },
   navButton: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  weekTitleButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 8,
   },
   weekTitle: {
     fontSize: 14,

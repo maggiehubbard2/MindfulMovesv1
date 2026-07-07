@@ -17,12 +17,7 @@ const normalizeDateToDay = (dateStr: string): string => {
   return `${year}-${month}-${day}`;
 };
 
-const formatLocalDate = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+import { formatLocalDate } from '@/utils/date';
 
 const collectActiveCompletionDays = (habits: StreakHabit[]): Set<string> => {
   const activeDays = new Set<string>();

@@ -3,9 +3,6 @@ import { useHabits } from '@/context/HabitsContext';
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 
-let lastRefreshTime = 0;
-const REFRESH_COOLDOWN = 30000; // 30 seconds
-
 /**
  * Triggers soft refresh (profile + habits) when app returns to foreground.
  * Uses AuthContext state only—no getSession()—so it never races with initial hydration.
@@ -29,21 +26,11 @@ export function useAppRefresh() {
         authReady &&
         user
       ) {
-        const now = Date.now();
-        if (now - lastRefreshTime < REFRESH_COOLDOWN) {
-          if (__DEV__) {
-            console.log('App refresh skipped: too soon since last refresh');
-          }
-          appState.current = nextAppState;
-          return;
-        }
-
         try {
           await Promise.allSettled([
             refreshUserProfile(),
             refreshHabits(),
           ]);
-          lastRefreshTime = now;
           if (__DEV__) {
             console.log('App refresh completed');
           }
@@ -62,4 +49,3 @@ export function useAppRefresh() {
     };
   }, [authReady, user, refreshUserProfile, refreshHabits]);
 }
-
