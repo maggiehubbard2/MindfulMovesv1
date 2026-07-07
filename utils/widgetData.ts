@@ -1,6 +1,7 @@
 import { NativeModules, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Habit } from '@/context/HabitsContext';
+import { getTodayDateString } from '@/utils/date';
 import { calculateCurrentStreak } from '@/utils/streak';
 
 /**
@@ -24,9 +25,10 @@ export interface WidgetData {
 
 export async function writeWidgetData(habits: Habit[]): Promise<void> {
   try {
+    const todayStr = getTodayDateString();
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split('T')[0];
 
     const todayHabits = habits.filter((habit) => {
       const createdAt = new Date(habit.createdAt);

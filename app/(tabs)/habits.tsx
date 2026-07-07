@@ -52,24 +52,33 @@ export default function HabitsScreen() {
     return formatDate(date);
   };
   
+  const canViewDate = (date: Date): boolean => {
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    return date <= endOfToday;
+  };
+
   const navigateDate = (days: number) => {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() + days);
-    if (canEditDate(newDate)) {
+    newDate.setHours(0, 0, 0, 0);
+    if (canViewDate(newDate)) {
       setSelectedDate(newDate);
     }
   };
-  
+
   const canNavigateBack = () => {
     const prevDate = new Date(selectedDate);
     prevDate.setDate(prevDate.getDate() - 1);
-    return canEditDate(prevDate);
+    prevDate.setHours(0, 0, 0, 0);
+    return true;
   };
-  
+
   const canNavigateForward = () => {
     const nextDate = new Date(selectedDate);
     nextDate.setDate(nextDate.getDate() + 1);
-    return canEditDate(nextDate);
+    nextDate.setHours(0, 0, 0, 0);
+    return canViewDate(nextDate);
   };
 
   return (

@@ -1,9 +1,11 @@
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { writeWidgetData } from '@/utils/widgetData';
-import { calculateCurrentStreak, calculateLongestStreak } from '@/utils/streak';
+import { formatLocalDate, getTodayDateString } from '@/utils/date';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { calculateCurrentStreak, calculateLongestStreak } from '@/utils/streak';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { Linking } from 'react-native';
 
 export interface Habit {
   id: string;
@@ -41,23 +43,17 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   const { user, userProfile } = useAuth();
   const hasHydratedRef = React.useRef(false);
 
-  // Write widget data whenever habits change (including empty state for widget)
+  // Sync widget after habits are hydrated (skip empty pre-load state)
   useEffect(() => {
-    if (user) {
-      // Defer widget write to not block UI
-      const writeWidget = () => {
-        writeWidgetData(habits).catch(() => {
-          // Silent fail for widget writes
-        });
-      };
-      
-      if (typeof requestIdleCallback !== 'undefined') {
-        requestIdleCallback(writeWidget);
-      } else {
-        setTimeout(writeWidget, 0);
-      }
-    }
+    if (!user || !hasHydratedRef.current) return;
+    writeWidgetData(habits).catch(() => {});
   }, [habits, user]);
+
+  const goToToday = useCallback(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    setSelectedDate(today);
+  }, []);
 
   // Load habits from Supabase when user is authenticated
   useEffect(() => {
@@ -179,6 +175,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         const orderedHabits = await applyPersistedOrder(updatedHabits);
         setHabits(orderedHabits);
         hasHydratedRef.current = true;
+        writeWidgetData(orderedHabits).catch(() => {});
       }
     } catch (error) {
       // Silent fail - will load from Supabase
@@ -223,6 +220,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       // Update state with ordered habits
       setHabits(orderedHabits);
       hasHydratedRef.current = true;
+      writeWidgetData(orderedHabits).catch(() => {});
       
       // Defer AsyncStorage write to not block UI - use requestIdleCallback if available
       // Note: We don't overwrite habitOrder here - it's only updated on explicit reorder
@@ -246,21 +244,20 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  // Cache today's date string to avoid repeated calculations
-  const getTodayDateString = ((): (() => string) => {
-    let cached: string | undefined;
-    let cachedKey: string | undefined;
-    
-    return () => {
-      const now = new Date();
-      const todayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
-      if (!cached || cachedKey !== todayKey) {
-        cached = now.toISOString().split('T')[0];
-        cachedKey = todayKey;
+  // Widget / lock screen deep link: open dashboard on today with fresh data
+  useEffect(() => {
+    const handleDeepLink = (url: string | null) => {
+      if (!url || !user) return;
+      if (url.includes('dashboard')) {
+        goToToday();
+        loadHabitsFromSupabase();
       }
-      return cached;
     };
-  })();
+
+    Linking.getInitialURL().then(handleDeepLink);
+    const subscription = Linking.addEventListener('url', ({ url }) => handleDeepLink(url));
+    return () => subscription.remove();
+  }, [user, goToToday, loadHabitsFromSupabase]);
 
   // Check if we need to reset habits for a new day
   const checkAndResetHabits = async () => {
@@ -439,7 +436,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     if (!habitToUpdate) return;
 
     const targetDate = date || selectedDate;
-    const dateStr = targetDate.toISOString().split('T')[0];
+    const dateStr = formatLocalDate(targetDate);
     const today = getTodayDateString();
     
     // Check if we can edit this date
@@ -492,7 +489,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   // Get habits for a specific date (with completion status for that date)
   // Memoized to prevent unnecessary recalculations
   const getHabitsForDate = useCallback((date: Date): Habit[] => {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = formatLocalDate(date);
     return habits.map(habit => {
       const isCompleted = (habit.completionDates || []).includes(dateStr);
       return {
