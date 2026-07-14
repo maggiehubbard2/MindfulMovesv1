@@ -1,5 +1,6 @@
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { useSubscription } from '@/context/SubscriptionContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -51,6 +52,13 @@ const normalizeHex = (hex: string) => {
 export default function SettingsScreen() {
   const { isDarkMode, toggleDarkMode, colors, accentColor, setAccentColor, customAccentColor } = useTheme();
   const { user, userProfile, logout, deleteUserInfo } = useAuth();
+  const {
+    isPro,
+    isLoading: isSubscriptionLoading,
+    presentPaywall,
+    presentCustomerCenter,
+    restorePurchases,
+  } = useSubscription();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -607,6 +615,76 @@ export default function SettingsScreen() {
               />
             )
           )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Subscription</Text>
+          <View style={[styles.settingItem, { backgroundColor: colors.card }]}>
+            <View style={styles.settingInfo}>
+              <Ionicons
+                name={isPro ? 'diamond' : 'diamond-outline'}
+                size={24}
+                color={colors.primary}
+              />
+              <View style={styles.userInfo}>
+                <Text style={[styles.settingText, { color: colors.text }]}>
+                  {isSubscriptionLoading
+                    ? 'Checking status…'
+                    : isPro
+                      ? 'Mindful Moves Pro'
+                      : 'Free plan'}
+                </Text>
+                <Text style={[styles.userEmail, { color: colors.secondary }]}>
+                  {isPro
+                    ? 'Full access unlocked'
+                    : 'Upgrade for the full experience'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {!isPro && (
+            <TouchableOpacity
+              style={[styles.settingItem, { backgroundColor: colors.card }]}
+              onPress={() => {
+                void presentPaywall();
+              }}
+            >
+              <View style={styles.settingInfo}>
+                <Ionicons name="sparkles-outline" size={24} color={colors.primary} />
+                <Text style={[styles.settingText, { color: colors.text }]}>Upgrade to Pro</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.secondary} />
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[styles.settingItem, { backgroundColor: colors.card }]}
+            onPress={() => {
+              void presentCustomerCenter();
+            }}
+          >
+            <View style={styles.settingInfo}>
+              <Ionicons name="card-outline" size={24} color={colors.text} />
+              <Text style={[styles.settingText, { color: colors.text }]}>
+                Manage subscription
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.secondary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.settingItem, { backgroundColor: colors.card }]}
+            onPress={() => {
+              void restorePurchases();
+            }}
+          >
+            <View style={styles.settingInfo}>
+              <Ionicons name="refresh-outline" size={24} color={colors.text} />
+              <Text style={[styles.settingText, { color: colors.text }]}>Restore purchases</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.secondary} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
