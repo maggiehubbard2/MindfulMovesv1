@@ -2,6 +2,7 @@ import HabitList from '@/components/HabitList';
 import { useAuth } from '@/context/AuthContext';
 import { useHabits } from '@/context/HabitsContext';
 import { ThemeContextType, useTheme } from '@/context/ThemeContext';
+import { useHabitLimitGate } from '@/hooks/useHabitLimitGate';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
@@ -14,6 +15,7 @@ export default function HabitsScreen() {
   const { habits, selectedDate, setSelectedDate, toggleHabit, removeHabit, updateHabit, reorderHabits, getHabitsForDate, canEditDate } = useHabits();
   const { colors, isDarkMode }: ThemeContextType = useTheme();
   const { userProfile } = useAuth();
+  const { ensureCanAddHabit } = useHabitLimitGate();
   const [showDatePicker, setShowDatePicker] = useState(false);
   
   const isAdmin = userProfile?.isAdmin === true;
@@ -94,7 +96,11 @@ export default function HabitsScreen() {
             </View>
             <TouchableOpacity
               style={[styles.addButton, { backgroundColor: colors.primary }]}
-              onPress={() => router.push('/addhabit')}
+              onPress={async () => {
+                if (await ensureCanAddHabit()) {
+                  router.push('/addhabit');
+                }
+              }}
             >
               <Ionicons name="add" size={24} color="white" />
             </TouchableOpacity>
@@ -175,7 +181,11 @@ export default function HabitsScreen() {
         {isToday && (
           <TouchableOpacity
             style={[styles.fab, { backgroundColor: colors.primary }]}
-            onPress={() => router.push('/addhabit')}
+            onPress={async () => {
+              if (await ensureCanAddHabit()) {
+                router.push('/addhabit');
+              }
+            }}
           >
             <Ionicons name="add" size={28} color="white" />
           </TouchableOpacity>

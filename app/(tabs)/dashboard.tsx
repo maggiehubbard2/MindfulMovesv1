@@ -6,6 +6,7 @@ import WeeklyCalendar from '@/components/WeeklyCalendar';
 import { useAuth } from '@/context/AuthContext';
 import { useHabits } from '@/context/HabitsContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useHabitLimitGate } from '@/hooks/useHabitLimitGate';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -18,6 +19,7 @@ export default function DashboardScreen() {
   const { colors, isDarkMode } = useTheme();
   const { userProfile, refreshUserProfile, loading } = useAuth();
   const { setSelectedDate, getHabitsForDate, selectedDate, habits, calculateCurrentStreak, refresh } = useHabits();
+  const { ensureCanAddHabit } = useHabitLimitGate();
   const [showConfetti, setShowConfetti] = useState(false);
   const [showShareScreen, setShowShareScreen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -181,7 +183,11 @@ export default function DashboardScreen() {
           {/* Floating Action Button */}
           <TouchableOpacity
             style={[styles.fab, { backgroundColor: colors.primary }]}
-            onPress={() => router.push('/addhabit')}
+            onPress={async () => {
+              if (await ensureCanAddHabit()) {
+                router.push('/addhabit');
+              }
+            }}
             activeOpacity={0.8}
           >
             <Ionicons name="add" size={28} color="white" />
