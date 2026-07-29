@@ -1,3 +1,4 @@
+import { isFreeAccentColor } from '@/config/subscription';
 import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useSubscription } from '@/context/SubscriptionContext';
@@ -56,9 +57,12 @@ export default function SettingsScreen() {
     isPro,
     isLoading: isSubscriptionLoading,
     presentPaywall,
+    presentPaywallIfNeeded,
     presentCustomerCenter,
     restorePurchases,
   } = useSubscription();
+  const isAdmin = userProfile?.isAdmin === true;
+  const hasUnlimitedColors = isPro || isAdmin;
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -419,10 +423,28 @@ export default function SettingsScreen() {
     },
   ];
 
-  const handleOpenColorPicker = () => {
+  const handleOpenColorPicker = async () => {
+    if (!hasUnlimitedColors) {
+      const unlocked = await presentPaywallIfNeeded();
+      if (!unlocked) return;
+    }
     setTempCustomColor(customAccentColor);
     setHexInput(customAccentColor);
     setShowColorPicker(true);
+  };
+
+  const handleSelectAccentOption = async (value: string) => {
+    if (value === 'custom') {
+      await handleOpenColorPicker();
+      return;
+    }
+
+    if (!hasUnlimitedColors && !isFreeAccentColor(value)) {
+      const unlocked = await presentPaywallIfNeeded();
+      if (!unlocked) return;
+    }
+
+    setAccentColor(value as any);
   };
 
   const handleSelectPreset = (color: string) => {
@@ -466,6 +488,7 @@ export default function SettingsScreen() {
             <View style={styles.colorOptions}>
               {accentColorOptions.map((option) => {
                 const isActive = accentColor === option.value;
+                const isLocked = !hasUnlimitedColors && !isFreeAccentColor(option.value);
                 return (
                   <TouchableOpacity
                     key={option.value}
@@ -474,11 +497,7 @@ export default function SettingsScreen() {
                       { borderColor: isActive ? colors.primary : colors.border },
                     ]}
                     onPress={() => {
-                      if (option.value === 'custom') {
-                        handleOpenColorPicker();
-                      } else {
-                        setAccentColor(option.value as any);
-                      }
+                      void handleSelectAccentOption(option.value);
                     }}
                   >
                     {option.isCustom ? (
@@ -510,6 +529,11 @@ export default function SettingsScreen() {
                             <Ionicons name="checkmark" size={14} color="#FFFFFF" />
                           </View>
                         )}
+                        {isLocked && (
+                          <View style={styles.customCheckBadge}>
+                            <Ionicons name="lock-closed" size={12} color="#FFFFFF" />
+                          </View>
+                        )}
                       </View>
                     ) : (
                       <View
@@ -517,11 +541,14 @@ export default function SettingsScreen() {
                         styles.presetSwatchInner,
                         { backgroundColor: option.color },
                       ]}
-                    >
-                      {isActive && (
-                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                      )}
-                    </View>
+                      >
+                        {isActive && (
+                          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                        )}
+                        {isLocked && !isActive && (
+                          <Ionicons name="lock-closed" size={12} color="#FFFFFF" />
+                        )}
+                      </View>
                     )}
                   </TouchableOpacity>
                 );

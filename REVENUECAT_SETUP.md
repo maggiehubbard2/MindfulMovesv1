@@ -105,7 +105,15 @@ Identity uses Supabase `user.id` via `Purchases.logIn` / `logOut` automatically.
 6. Manage subscription → Customer Center opens.
 7. Restore purchases after reinstall / new login.
 
-## Notes
+## Pro gates (in app)
+
+| Feature | Free | Pro |
+|---------|------|-----|
+| Habits | Up to **3** | Unlimited |
+| Accent colors | **Blue** only | Pink, Green, Purple, Custom |
+
+Constants live in `config/subscription.ts`. Admins bypass both gates for testing.
+
 
 - Configure a Paywall in the dashboard before calling `presentPaywall` or you will get an error / empty state.
 - Hot reload alone is not enough after adding native modules — rebuild with `expo run:ios` or EAS.

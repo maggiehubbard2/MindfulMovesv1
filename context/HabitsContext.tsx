@@ -1,11 +1,13 @@
 import { supabase } from '@/config/supabase';
+import { canAddHabit, FREE_HABIT_LIMIT } from '@/config/subscription';
 import { useAuth } from '@/context/AuthContext';
+import { useSubscription } from '@/context/SubscriptionContext';
 import { writeWidgetData } from '@/utils/widgetData';
 import { formatLocalDate, getTodayDateString } from '@/utils/date';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calculateCurrentStreak, calculateLongestStreak } from '@/utils/streak';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { Linking } from 'react-native';
+import { Alert, Linking } from 'react-native';
 
 export interface Habit {
   id: string;
@@ -41,6 +43,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const { user, userProfile } = useAuth();
+  const { isPro } = useSubscription();
   const hasHydratedRef = React.useRef(false);
 
   // Sync widget after habits are hydrated (skip empty pre-load state)
@@ -322,6 +325,15 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
 
   const addHabit = async (name: string, description?: string) => {
     if (!user) return;
+
+    const isAdmin = userProfile?.isAdmin === true;
+    if (!canAddHabit(isPro, habits.length, isAdmin)) {
+      Alert.alert(
+        'Habit limit reached',
+        `Free accounts can track up to ${FREE_HABIT_LIMIT} habits. Upgrade to Pro for unlimited habits.`
+      );
+      return;
+    }
     
     try {
       const habitData = {

@@ -5,6 +5,7 @@ import { SubscriptionProvider } from '@/context/SubscriptionContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { useAppRefresh } from '@/hooks/useAppRefresh';
 import { useAppResumeAuth } from '@/hooks/useAppResumeAuth';
+import { useProAccentEnforcement } from '@/hooks/useProAccentEnforcement';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect } from 'react';
@@ -20,6 +21,7 @@ function RootLayoutNav() {
 
   useAppRefresh();
   useAppResumeAuth();
+  useProAccentEnforcement();
 
 //  const inLogin = segments[0] === 'login';
 //   const inTabs = segments[0] === '(tabs)';

@@ -200,13 +200,12 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         displayCloseButton: true,
       });
 
-      await refreshCustomerInfo();
+      const info = await refreshCustomerInfo();
+      if (hasProEntitlement(info)) {
+        return true;
+      }
 
-      return (
-        result === PAYWALL_RESULT.PURCHASED ||
-        result === PAYWALL_RESULT.RESTORED ||
-        result === PAYWALL_RESULT.NOT_PRESENTED
-      );
+      return result === PAYWALL_RESULT.PURCHASED || result === PAYWALL_RESULT.RESTORED;
     } catch (error) {
       Alert.alert('Purchase error', getErrorMessage(error));
       return false;
