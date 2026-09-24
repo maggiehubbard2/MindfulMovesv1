@@ -2,6 +2,7 @@ import { canAddHabit, FREE_HABIT_LIMIT } from '@/config/subscription';
 import { useAuth } from '@/context/AuthContext';
 import { useHabits } from '@/context/HabitsContext';
 import { useSubscription } from '@/context/SubscriptionContext';
+import { isDemoMode } from '@/utils/demoMode';
 import { useCallback } from 'react';
 import { Alert } from 'react-native';
 
@@ -16,7 +17,7 @@ export function useHabitLimitGate() {
   const isAdmin = userProfile?.isAdmin === true;
 
   const ensureCanAddHabit = useCallback(async (): Promise<boolean> => {
-    if (canAddHabit(isPro, habits.length, isAdmin)) {
+    if (isDemoMode() || canAddHabit(isPro, habits.length, isAdmin)) {
       return true;
     }
 
@@ -37,6 +38,6 @@ export function useHabitLimitGate() {
   return {
     ensureCanAddHabit,
     freeHabitLimit: FREE_HABIT_LIMIT,
-    isAtHabitLimit: !canAddHabit(isPro, habits.length, isAdmin),
+    isAtHabitLimit: !isDemoMode() && !canAddHabit(isPro, habits.length, isAdmin),
   };
 }

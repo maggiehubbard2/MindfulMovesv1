@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useHabits } from '@/context/HabitsContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useHabitLimitGate } from '@/hooks/useHabitLimitGate';
+import { consumeStreakPreview, isDemoMode, subscribeStreakPreview } from '@/utils/demoMode';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -24,6 +25,15 @@ export default function DashboardScreen() {
   const [showShareScreen, setShowShareScreen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const previousAllCompletedRef = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    if (!isDemoMode()) return;
+    const openIfRequested = () => {
+      if (consumeStreakPreview()) setShowShareScreen(true);
+    };
+    openIfRequested();
+    return subscribeStreakPreview(openIfRequested);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -149,12 +159,13 @@ export default function DashboardScreen() {
           <View style={styles.topHeader}>
             <View style={styles.greetingContainer}>
               <Text style={[styles.greeting, { color: colors.text }]}>
-              {greeting}, {userProfile?.firstName || 'there'}{' '}
-              
-              {userProfile?.isAdmin ? (
-                <Text style={styles.adminTag}>(admin)</Text>
-              ) : (
-                <Text style={styles.betaTag}>(beta)</Text>
+              {greeting}, {userProfile?.firstName || 'there'}
+              {!isDemoMode() && (
+                userProfile?.isAdmin ? (
+                  <Text style={styles.adminTag}> (admin)</Text>
+                ) : (
+                  <Text style={styles.betaTag}> (beta)</Text>
+                )
               )}
             </Text>
               <Text style={[styles.dateText, { color: colors.secondary }]}>
@@ -175,7 +186,7 @@ export default function DashboardScreen() {
           <WeeklyCalendar onDatePress={handleDatePress} />
 
           {/* Reminder Card */}
-          <ReminderCard />
+          {!isDemoMode() && <ReminderCard />}
 
           {/* Daily Routine List */}
           <DailyHabitList onHabitToggle={handleHabitToggle} />
