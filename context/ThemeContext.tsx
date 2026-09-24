@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { isDemoMode } from '@/utils/demoMode';
 
 type AccentColorKey = 'blue' | 'pink' | 'green' | 'purple' | 'custom';
 
@@ -55,17 +56,23 @@ const darkColors = {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const demoMode = isDemoMode();
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [accentColor, setAccentColor] = useState<AccentColorKey>('blue');
+  const [accentColor, setAccentColor] = useState<AccentColorKey>(demoMode ? 'purple' : 'blue');
   const [customAccentColor, setCustomAccentColor] = useState<string>('#FF6B6B');
 
   useEffect(() => {
     console.log('[COLD_START] ThemeProvider mounting...');
-    loadThemePreference();
+    if (demoMode) {
+      setIsDarkMode(false);
+      setAccentColor('purple');
+    } else {
+      loadThemePreference();
+    }
     return () => {
       console.log('[COLD_START] ThemeProvider unmounting');
     };
-  }, []);
+  }, [demoMode]);
 
   const loadThemePreference = async () => {
     try {
@@ -95,6 +102,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     try {
       const newDarkMode = !isDarkMode;
       setIsDarkMode(newDarkMode);
+      if (isDemoMode()) return;
       await AsyncStorage.setItem('darkMode', JSON.stringify(newDarkMode));
     } catch (error) {
       console.error('Error saving dark mode preference:', error);
@@ -147,9 +155,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (color === 'custom') {
         const normalizedCustom = normalizeHex(customColor || customAccentColor);
         setCustomAccentColor(normalizedCustom);
-        await AsyncStorage.setItem('customAccentColor', normalizedCustom);
+        if (!isDemoMode()) {
+          await AsyncStorage.setItem('customAccentColor', normalizedCustom);
+        }
       }
       setAccentColor(color);
+      if (isDemoMode()) return;
       await AsyncStorage.setItem('accentColor', color);
     } catch (error) {
       console.error('Error saving accent color preference:', error);

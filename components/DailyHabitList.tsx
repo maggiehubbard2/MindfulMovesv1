@@ -1,5 +1,6 @@
 import { useHabits } from '@/context/HabitsContext';
 import { useTheme } from '@/context/ThemeContext';
+import { formatLocalDate } from '@/utils/date';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
@@ -101,7 +102,7 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
     
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = formatLocalDate(today);
     
     // Check if today is completed
     const hasToday = completionDates.includes(todayStr);
@@ -117,7 +118,7 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
     // Count consecutive days going backwards
     // Limit to 365 days to prevent infinite loops
     for (let i = 0; i < 365; i++) {
-      const dateStr = currentDate.toISOString().split('T')[0];
+      const dateStr = formatLocalDate(currentDate);
       const isCompleted = completionDates.includes(dateStr);
       
       if (isCompleted) {

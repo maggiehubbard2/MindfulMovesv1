@@ -2,6 +2,7 @@ import { isFreeAccentColor } from '@/config/subscription';
 import { useAuth } from '@/context/AuthContext';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useTheme } from '@/context/ThemeContext';
+import { isDemoMode } from '@/utils/demoMode';
 import { useEffect } from 'react';
 
 /**
@@ -15,6 +16,7 @@ export function useProAccentEnforcement() {
   const isAdmin = userProfile?.isAdmin === true;
 
   useEffect(() => {
+    if (isDemoMode()) return;
     if (isLoading) return;
     if (isPro || isAdmin) return;
     if (!isFreeAccentColor(accentColor)) {

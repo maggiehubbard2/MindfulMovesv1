@@ -3,6 +3,7 @@ import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useSubscription } from '@/context/SubscriptionContext';
 import { useTheme } from '@/context/ThemeContext';
+import { isDemoMode, requestStreakPreview } from '@/utils/demoMode';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -62,7 +63,7 @@ export default function SettingsScreen() {
     restorePurchases,
   } = useSubscription();
   const isAdmin = userProfile?.isAdmin === true;
-  const hasUnlimitedColors = isPro || isAdmin;
+  const hasUnlimitedColors = isPro || isAdmin || isDemoMode();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -761,6 +762,30 @@ export default function SettingsScreen() {
             <Text style={[styles.settingValue, { color: colors.text }]}>1.0.0</Text>
           </View>
         </View>
+
+        {isDemoMode() && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Screenshots</Text>
+            <TouchableOpacity
+              style={[styles.settingItem, { backgroundColor: colors.card }]}
+              onPress={() => {
+                requestStreakPreview();
+                router.push('/(tabs)/dashboard');
+              }}
+            >
+              <View style={styles.settingInfo}>
+                <Ionicons name="flame-outline" size={24} color={colors.primary} />
+                <View style={styles.userInfo}>
+                  <Text style={[styles.settingText, { color: colors.text }]}>Preview streak card</Text>
+                  <Text style={[styles.userEmail, { color: colors.secondary }]}>
+                    Opens the share screen without checking every habit
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.secondary} />
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       {/* HEX Code Color Picker Modal */}

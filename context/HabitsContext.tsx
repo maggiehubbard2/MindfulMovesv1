@@ -2,6 +2,8 @@ import { supabase } from '@/config/supabase';
 import { canAddHabit, FREE_HABIT_LIMIT } from '@/config/subscription';
 import { useAuth } from '@/context/AuthContext';
 import { useSubscription } from '@/context/SubscriptionContext';
+import { buildDemoHabits } from '@/utils/demoHabits';
+import { isDemoMode } from '@/utils/demoMode';
 import { writeWidgetData } from '@/utils/widgetData';
 import { formatLocalDate, getTodayDateString } from '@/utils/date';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -61,6 +63,16 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   // Load habits from Supabase when user is authenticated
   useEffect(() => {
     if (user) {
+      if (isDemoMode()) {
+        const demoHabits = buildDemoHabits(user.id);
+        setHabits(demoHabits);
+        hasHydratedRef.current = true;
+        if (__DEV__) {
+          console.log('[demo] Screenshot habits loaded in memory only');
+        }
+        return;
+      }
+
       // Load from cache first for instant UI, then sync with server
       loadHabitsFromCache();
       // Defer Supabase load to not block initial render
@@ -187,6 +199,12 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
 
   const loadHabitsFromSupabase = useCallback(async () => {
     if (!user) return;
+
+    if (isDemoMode()) {
+      setHabits(buildDemoHabits(user.id));
+      hasHydratedRef.current = true;
+      return;
+    }
     
     try {
       // Optimize: Only select needed fields, use single() if expecting one result
@@ -281,6 +299,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
 
   // Reset habits for new day - archive completions but keep habit definitions
   const resetHabitsForNewDay = async () => {
+    if (isDemoMode()) return;
     if (!user || habits.length === 0) return;
     
     // Update all habits to reset completed status for today
@@ -325,6 +344,20 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
 
   const addHabit = async (name: string, description?: string) => {
     if (!user) return;
+
+    if (isDemoMode()) {
+      const newHabit: Habit = {
+        id: `demo-${Date.now()}`,
+        name,
+        description,
+        completed: false,
+        userId: user.id,
+        createdAt: new Date(),
+        completionDates: [],
+      };
+      setHabits([...habits, newHabit]);
+      return;
+    }
 
     const isAdmin = userProfile?.isAdmin === true;
     if (!canAddHabit(isPro, habits.length, isAdmin)) {
@@ -421,26 +454,30 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       completionDates: habitToUpdate.completionDates || [],
     };
 
-    // Update in Supabase
-    try {
-      const { error } = await supabase
-        .from('habit')
-        .update({
-          name,
-          description: description || null, // Supabase uses null, but we convert to undefined in our types
-        })
-        .eq('id', id);
-      
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error updating habit in Supabase:', error);
-      // Supabase update failed, continue with local update
+    if (!isDemoMode()) {
+      // Update in Supabase
+      try {
+        const { error } = await supabase
+          .from('habit')
+          .update({
+            name,
+            description: description || null, // Supabase uses null, but we convert to undefined in our types
+          })
+          .eq('id', id);
+        
+        if (error) throw error;
+      } catch (error) {
+        console.error('Error updating habit in Supabase:', error);
+        // Supabase update failed, continue with local update
+      }
     }
 
     // Update local state
     const newHabits = habits.map((habit) => habit.id === id ? updatedHabit : habit);
     setHabits(newHabits);
-    await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
+    if (!isDemoMode()) {
+      await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
+    }
   };
 
   const toggleHabit = async (id: string, date?: Date) => {
@@ -475,27 +512,31 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       completionDates: newCompletionDates,
     };
 
-    // Update in Supabase
-    try {
-      const { error } = await supabase
-        .from('habit')
-        .update({
-          completed: dateStr === today ? completed : habitToUpdate.completed,
-          completed_at: completedAt || null,
-          completion_dates: newCompletionDates,
-        })
-        .eq('id', id);
-      
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error updating habit in Supabase:', error);
-      // Supabase update failed, continue with local update
+    if (!isDemoMode()) {
+      // Update in Supabase
+      try {
+        const { error } = await supabase
+          .from('habit')
+          .update({
+            completed: dateStr === today ? completed : habitToUpdate.completed,
+            completed_at: completedAt || null,
+            completion_dates: newCompletionDates,
+          })
+          .eq('id', id);
+        
+        if (error) throw error;
+      } catch (error) {
+        console.error('Error updating habit in Supabase:', error);
+        // Supabase update failed, continue with local update
+      }
     }
 
     // Update local state
     const newHabits = habits.map((habit) => habit.id === id ? updatedHabit : habit);
     setHabits(newHabits);
-    await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
+    if (!isDemoMode()) {
+      await AsyncStorage.setItem('habits', JSON.stringify(newHabits));
+    }
   };
 
   // Get habits for a specific date (with completion status for that date)
@@ -533,22 +574,26 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
   }, [userProfile?.isAdmin]);
 
   const removeHabit = async (id: string) => {
-    try {
-      // Delete from Supabase
-      const { error } = await supabase
-        .from('habit')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error deleting habit from Supabase:', error);
-      // Continue with local deletion even if Supabase fails
+    if (!isDemoMode()) {
+      try {
+        // Delete from Supabase
+        const { error } = await supabase
+          .from('habit')
+          .delete()
+          .eq('id', id);
+        
+        if (error) throw error;
+      } catch (error) {
+        console.error('Error deleting habit from Supabase:', error);
+        // Continue with local deletion even if Supabase fails
+      }
     }
 
     // Update local state
     const newHabits = habits.filter((habit) => habit.id !== id);
     setHabits(newHabits);
+
+    if (isDemoMode()) return;
     
     // Update order array to remove deleted habit ID
     try {
@@ -556,8 +601,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
         val => val ? JSON.parse(val) : habits.map(h => h.id)
       ).catch(() => habits.map(h => h.id));
       const newOrder = currentOrder.filter((habitId: string) => habitId !== id);
-      
-      // Persist both habits array and updated order
+
       await Promise.all([
         AsyncStorage.setItem('habits', JSON.stringify(newHabits)),
         AsyncStorage.setItem('habitOrder', JSON.stringify(newOrder)),
@@ -576,6 +620,8 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     // Persist both the full habits array and the order (array of IDs)
     // This ensures order persists across app closures and relaunches
     const orderIds = reorderedHabits.map(h => h.id);
+
+    if (isDemoMode()) return;
     
     try {
       await Promise.all([

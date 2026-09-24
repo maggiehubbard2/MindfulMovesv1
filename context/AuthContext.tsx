@@ -1,4 +1,5 @@
 import { supabase, supabaseUrl } from '@/config/supabase';
+import { DEMO_FIRST_NAME, isDemoMode } from '@/utils/demoMode';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '@supabase/supabase-js';
 import { router } from 'expo-router';
@@ -33,6 +34,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Screenshot sessions show Maya. The stored profile is left unchanged. */
+function displayProfile(profile: UserProfile): UserProfile {
+  if (!isDemoMode()) return profile;
+  return { ...profile, firstName: DEMO_FIRST_NAME, name: DEMO_FIRST_NAME };
+}
+
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -43,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const safeSetUserProfile = async (profile: UserProfile) => {
   try {
-    setUserProfile(profile);
+    setUserProfile(displayProfile(profile));
     await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
   } catch (error) {
     console.warn('[AuthContext] Failed to cache user profile, continuing anyway', error);
@@ -77,8 +84,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           created_at: data.created_at,
           isAdmin: data.is_admin,
         };
-        setUserProfile(profile);
-        // await AsyncStorage.setItem('userProfile', JSON.stringify(profile));
         await safeSetUserProfile(profile);
       }
     } catch (error) {
@@ -121,7 +126,7 @@ useEffect(() => {
 
           if (cachedProfile) {
             try {
-              setUserProfile(JSON.parse(cachedProfile));
+              setUserProfile(displayProfile(JSON.parse(cachedProfile)));
             } catch {
               console.warn('[COLD_START] Invalid cached profile, fetching fresh...');
             }
@@ -280,14 +285,14 @@ useEffect(() => {
         await fetchUserProfile(authData.user.id);
       } else if (authData.user) {
         // Email confirmation required - set profile from metadata temporarily
-        setUserProfile({
+        setUserProfile(displayProfile({
           id: authData.user.id,
           email: authData.user.email || email,
           name: firstName,
           firstName: firstName,
           dateOfBirth: dobString || undefined,
           created_at: new Date().toISOString(),
-        });
+        }));
       }
     } catch (error: any) {
       throw error;
