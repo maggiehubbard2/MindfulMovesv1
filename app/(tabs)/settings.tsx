@@ -7,6 +7,7 @@ import { isDemoMode, requestStreakPreview } from '@/utils/demoMode';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
@@ -759,7 +760,9 @@ export default function SettingsScreen() {
               <Ionicons name="information-circle-outline" size={24} color={colors.text} />
               <Text style={[styles.settingText, { color: colors.text }]}>Version</Text>
             </View>
-            <Text style={[styles.settingValue, { color: colors.text }]}>1.0.0</Text>
+            <Text style={[styles.settingValue, { color: colors.text }]}>
+              {Constants.expoConfig?.version ?? ''}
+            </Text>
           </View>
         </View>
 
