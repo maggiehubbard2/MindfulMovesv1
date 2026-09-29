@@ -1,7 +1,7 @@
 export const FREE_HABIT_LIMIT = 3;
 
-/** Accent keys available without Mindful Moves Pro */
-export const FREE_ACCENT_COLORS = ['blue'] as const;
+/** Accent keys available without Mindful Moves Pro. Custom is the only locked option. */
+export const FREE_ACCENT_COLORS = ['blue', 'pink', 'green', 'purple'] as const;
 
 export type FreeAccentColor = (typeof FREE_ACCENT_COLORS)[number];
 

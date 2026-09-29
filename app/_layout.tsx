@@ -2,7 +2,7 @@ import '@/config/supabase'; // Initialize Supabase
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { HabitsProvider } from '@/context/HabitsContext';
 import { SubscriptionProvider } from '@/context/SubscriptionContext';
-import { ThemeProvider } from '@/context/ThemeContext';
+import { ThemeProvider, useSyncAccentFromProfile } from '@/context/ThemeContext';
 import { useAppRefresh } from '@/hooks/useAppRefresh';
 import { useAppResumeAuth } from '@/hooks/useAppResumeAuth';
 import { useProAccentEnforcement } from '@/hooks/useProAccentEnforcement';
@@ -28,6 +28,7 @@ function RootLayoutNav() {
 
   useAppRefresh();
   useAppResumeAuth();
+  useSyncAccentFromProfile();
   useProAccentEnforcement();
 
   const isNavigationReady = segments.length > 0;
@@ -146,15 +147,15 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <ThemeProvider>
-      <AuthProvider>
+    <AuthProvider>
+      <ThemeProvider>
         <SubscriptionProvider>
           <HabitsProvider>
             <RootLayoutNav />
           </HabitsProvider>
         </SubscriptionProvider>
-      </AuthProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
 
