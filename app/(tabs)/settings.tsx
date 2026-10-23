@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -67,6 +67,8 @@ export default function SettingsScreen() {
   const hasUnlimitedColors = isPro || isAdmin || isDemoMode();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const pendingSubscriptionAction = useRef<(() => void) | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [tempCustomColor, setTempCustomColor] = useState(customAccentColor);
   const [hexInput, setHexInput] = useState(customAccentColor);
@@ -411,6 +413,26 @@ export default function SettingsScreen() {
    const handleLogout = () => {
     setShowLogoutModal(true);
   };
+
+  const subscriptionStatusLabel = isSubscriptionLoading
+    ? 'Checking status…'
+    : isPro
+      ? 'Mindful Moves Pro'
+      : 'Free plan';
+
+  const runPendingSubscriptionAction = () => {
+    const action = pendingSubscriptionAction.current;
+    pendingSubscriptionAction.current = null;
+    action?.();
+  };
+
+  const queueSubscriptionAction = (action: () => void) => {
+    pendingSubscriptionAction.current = action;
+    setShowSubscriptionModal(false);
+    if (Platform.OS !== 'ios') {
+      setTimeout(runPendingSubscriptionAction, 350);
+    }
+  };
   
   const accentColorOptions = [
     { name: 'Blue', value: 'blue', color: '#007AFF' },
@@ -647,8 +669,10 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Subscription</Text>
-          <View style={[styles.settingItem, { backgroundColor: colors.card }]}>
+          <TouchableOpacity
+            style={[styles.settingItem, { backgroundColor: colors.card }]}
+            onPress={() => setShowSubscriptionModal(true)}
+          >
             <View style={styles.settingInfo}>
               <Ionicons
                 name={isPro ? 'diamond' : 'diamond-outline'}
@@ -656,61 +680,11 @@ export default function SettingsScreen() {
                 color={colors.primary}
               />
               <View style={styles.userInfo}>
-                <Text style={[styles.settingText, { color: colors.text }]}>
-                  {isSubscriptionLoading
-                    ? 'Checking status…'
-                    : isPro
-                      ? 'Mindful Moves Pro'
-                      : 'Free plan'}
-                </Text>
+                <Text style={[styles.settingText, { color: colors.text }]}>Subscription</Text>
                 <Text style={[styles.userEmail, { color: colors.secondary }]}>
-                  {isPro
-                    ? 'Full access unlocked'
-                    : 'Upgrade for the full experience'}
+                  {subscriptionStatusLabel}
                 </Text>
               </View>
-            </View>
-          </View>
-
-          {!isPro && (
-            <TouchableOpacity
-              style={[styles.settingItem, { backgroundColor: colors.card }]}
-              onPress={() => {
-                void presentPaywall();
-              }}
-            >
-              <View style={styles.settingInfo}>
-                <Ionicons name="sparkles-outline" size={24} color={colors.primary} />
-                <Text style={[styles.settingText, { color: colors.text }]}>Upgrade to Pro</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.secondary} />
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={[styles.settingItem, { backgroundColor: colors.card }]}
-            onPress={() => {
-              void presentCustomerCenter();
-            }}
-          >
-            <View style={styles.settingInfo}>
-              <Ionicons name="card-outline" size={24} color={colors.text} />
-              <Text style={[styles.settingText, { color: colors.text }]}>
-                Manage subscription
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.secondary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.settingItem, { backgroundColor: colors.card }]}
-            onPress={() => {
-              void restorePurchases();
-            }}
-          >
-            <View style={styles.settingInfo}>
-              <Ionicons name="refresh-outline" size={24} color={colors.text} />
-              <Text style={[styles.settingText, { color: colors.text }]}>Restore purchases</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.secondary} />
           </TouchableOpacity>
@@ -891,6 +865,75 @@ export default function SettingsScreen() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+      <Modal
+        visible={showSubscriptionModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSubscriptionModal(false)}
+        onDismiss={runPendingSubscriptionAction}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setShowSubscriptionModal(false)}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={[styles.modalContent, styles.subscriptionModal, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Subscription</Text>
+            <View style={[styles.settingItem, styles.subscriptionModalItem, { backgroundColor: colors.background }]}>
+              <View style={styles.settingInfo}>
+                <Ionicons
+                  name={isPro ? 'diamond' : 'diamond-outline'}
+                  size={24}
+                  color={colors.primary}
+                />
+                <View style={styles.userInfo}>
+                  <Text style={[styles.settingText, { color: colors.text }]}>{subscriptionStatusLabel}</Text>
+                  <Text style={[styles.userEmail, { color: colors.secondary }]}>
+                    {isPro ? 'Full access unlocked' : 'Upgrade for the full experience'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {!isPro && (
+              <TouchableOpacity
+                style={[styles.settingItem, styles.subscriptionModalItem, { backgroundColor: colors.background }]}
+                onPress={() => queueSubscriptionAction(() => void presentPaywall())}
+              >
+                <View style={styles.settingInfo}>
+                  <Ionicons name="sparkles-outline" size={24} color={colors.primary} />
+                  <Text style={[styles.settingText, { color: colors.text }]}>Upgrade to Pro</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.secondary} />
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[styles.settingItem, styles.subscriptionModalItem, { backgroundColor: colors.background }]}
+              onPress={() => queueSubscriptionAction(() => void presentCustomerCenter())}
+            >
+              <View style={styles.settingInfo}>
+                <Ionicons name="card-outline" size={24} color={colors.text} />
+                <Text style={[styles.settingText, { color: colors.text }]}>Manage subscription</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.secondary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.settingItem, styles.subscriptionModalItem, { backgroundColor: colors.background }]}
+              onPress={() => queueSubscriptionAction(() => void restorePurchases())}
+            >
+              <View style={styles.settingInfo}>
+                <Ionicons name="refresh-outline" size={24} color={colors.text} />
+                <Text style={[styles.settingText, { color: colors.text }]}>Restore purchases</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.secondary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
 {/* Logout Confirmation Modal */}
       <Modal
         visible={showLogoutModal}
@@ -1150,6 +1193,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+  },
+  subscriptionModal: {
+    alignItems: 'stretch',
+  },
+  subscriptionModalItem: {
+    marginBottom: 8,
   },
   modalContent: {
     borderRadius: 16,

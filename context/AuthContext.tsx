@@ -13,6 +13,8 @@ interface UserProfile {
   dateOfBirth?: string; // ISO date string (YYYY-MM-DD)
   created_at: string;
   isAdmin?: boolean;
+  accentColor?: string;
+  customAccentColor?: string;
 }
 
 interface AuthContextType {
@@ -83,6 +85,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           dateOfBirth: data.date_of_birth || undefined,
           created_at: data.created_at,
           isAdmin: data.is_admin,
+          accentColor: data.accent_color ?? undefined,
+          customAccentColor: data.custom_accent_color ?? undefined,
         };
         await safeSetUserProfile(profile);
       }

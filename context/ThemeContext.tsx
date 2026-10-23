@@ -1,6 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '@/config/supabase';
+import { useAuth } from '@/context/AuthContext';
 import { isDemoMode } from '@/utils/demoMode';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 type AccentColorKey = 'blue' | 'pink' | 'green' | 'purple' | 'custom';
 
@@ -16,8 +18,13 @@ export interface ThemeContextType {
     secondary: string;
   };
   accentColor: AccentColorKey;
+  /** Accent stored for this user. May differ from accentColor during a session-only Pro fallback. */
+  persistedAccentColor: AccentColorKey;
   customAccentColor: string;
   setAccentColor: (color: AccentColorKey, customColor?: string) => void;
+  applyPersistedAccent: (color: string | undefined, customColor?: string) => void;
+  applySessionBlue: () => void;
+  restorePersistedAccent: () => void;
 }
 
 const accentColors = {
@@ -53,13 +60,56 @@ const darkColors = {
   border: '#38383A',
 };
 
+const ACCENT_COLOR_KEYS: AccentColorKey[] = ['blue', 'pink', 'green', 'purple', 'custom'];
+
+function isAccentColorKey(value: string | undefined | null): value is AccentColorKey {
+  return !!value && ACCENT_COLOR_KEYS.includes(value as AccentColorKey);
+}
+
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+function normalizeHex(hex: string) {
+  if (!hex) return '#FF6B6B';
+  let value = hex.trim();
+  if (!value.startsWith('#')) {
+    value = `#${value}`;
+  }
+  if (value.length === 4) {
+    value =
+      '#' +
+      value
+        .slice(1)
+        .split('')
+        .map((char) => char + char)
+        .join('');
+  }
+  return value.slice(0, 7).toUpperCase();
+}
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const demoMode = isDemoMode();
+  const { user } = useAuth();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [accentColor, setAccentColor] = useState<AccentColorKey>(demoMode ? 'purple' : 'blue');
+  const [persistedAccentColor, setPersistedAccentColor] = useState<AccentColorKey>(
+    demoMode ? 'purple' : 'blue'
+  );
   const [customAccentColor, setCustomAccentColor] = useState<string>('#FF6B6B');
+  const sessionBlueRef = useRef(false);
+  const persistedAccentRef = useRef<AccentColorKey>(demoMode ? 'purple' : 'blue');
+  const customAccentRef = useRef(customAccentColor);
+  const ignoreStaleProfileRef = useRef<AccentColorKey | null>(null);
+  const userIdRef = useRef(user?.id);
+
+  useEffect(() => {
+    customAccentRef.current = customAccentColor;
+  }, [customAccentColor]);
+
+  useEffect(() => {
+    userIdRef.current = user?.id;
+    sessionBlueRef.current = false;
+    ignoreStaleProfileRef.current = null;
+  }, [user?.id]);
 
   useEffect(() => {
     console.log('[COLD_START] ThemeProvider mounting...');
@@ -87,10 +137,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (darkModeValue !== null) {
         setIsDarkMode(JSON.parse(darkModeValue));
       }
-      if (accentColorValue !== null) {
-        setAccentColor(accentColorValue as AccentColorKey);
+      if (isAccentColorKey(accentColorValue)) {
+        persistedAccentRef.current = accentColorValue;
+        setPersistedAccentColor(accentColorValue);
+        if (!sessionBlueRef.current) {
+          setAccentColor(accentColorValue);
+        }
       }
       if (customAccentColorValue) {
+        customAccentRef.current = customAccentColorValue;
         setCustomAccentColor(customAccentColorValue);
       }
     } catch (error) {
@@ -107,24 +162,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Error saving dark mode preference:', error);
     }
-  };
-
-  const normalizeHex = (hex: string) => {
-    if (!hex) return '#FF6B6B';
-    let value = hex.trim();
-    if (!value.startsWith('#')) {
-      value = `#${value}`;
-    }
-    if (value.length === 4) {
-      value =
-        '#' +
-        value
-          .slice(1)
-          .split('')
-          .map((char) => char + char)
-          .join('');
-    }
-    return value.slice(0, 7).toUpperCase();
   };
 
   const lightenColor = (hex: string, amount = 0.25) => {
@@ -150,18 +187,87 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const cacheAccent = useCallback(async (color: AccentColorKey, customHex?: string) => {
+    await AsyncStorage.setItem('accentColor', color);
+    if (customHex) {
+      await AsyncStorage.setItem('customAccentColor', customHex);
+    }
+  }, []);
+
+  const rememberPersistedAccent = useCallback((color: AccentColorKey, customHex?: string) => {
+    persistedAccentRef.current = color;
+    setPersistedAccentColor(color);
+    if (customHex) {
+      customAccentRef.current = customHex;
+      setCustomAccentColor(customHex);
+    }
+  }, []);
+
+  const applyPersistedAccent = useCallback(
+    (color: string | undefined, customColor?: string) => {
+      if (isDemoMode() || !isAccentColorKey(color)) return;
+      if (ignoreStaleProfileRef.current && ignoreStaleProfileRef.current !== color) return;
+      if (ignoreStaleProfileRef.current === color) {
+        ignoreStaleProfileRef.current = null;
+      }
+
+      const customHex = customColor ? normalizeHex(customColor) : undefined;
+      rememberPersistedAccent(color, customHex);
+      if (color !== 'custom') {
+        sessionBlueRef.current = false;
+      }
+      if (!sessionBlueRef.current || color !== 'custom') {
+        setAccentColor(color);
+      }
+      cacheAccent(color, customHex).catch((error) => {
+        console.error('Error caching accent color from profile:', error);
+      });
+    },
+    [cacheAccent, rememberPersistedAccent]
+  );
+
+  const applySessionBlue = useCallback(() => {
+    if (isDemoMode() || persistedAccentRef.current !== 'custom') return;
+    sessionBlueRef.current = true;
+    setAccentColor('blue');
+  }, []);
+
+  const restorePersistedAccent = useCallback(() => {
+    if (isDemoMode()) return;
+    sessionBlueRef.current = false;
+    setAccentColor(persistedAccentRef.current);
+  }, []);
+
   const handleSetAccentColor = async (color: AccentColorKey, customColor?: string) => {
     try {
+      sessionBlueRef.current = false;
+      ignoreStaleProfileRef.current = color;
+
+      let customHex: string | undefined;
       if (color === 'custom') {
-        const normalizedCustom = normalizeHex(customColor || customAccentColor);
-        setCustomAccentColor(normalizedCustom);
-        if (!isDemoMode()) {
-          await AsyncStorage.setItem('customAccentColor', normalizedCustom);
-        }
+        customHex = normalizeHex(customColor || customAccentRef.current);
       }
+
+      rememberPersistedAccent(color, customHex);
       setAccentColor(color);
       if (isDemoMode()) return;
-      await AsyncStorage.setItem('accentColor', color);
+
+      await cacheAccent(color, customHex);
+
+      const userId = userIdRef.current;
+      if (!userId) return;
+
+      const update: { accent_color: AccentColorKey; custom_accent_color?: string } = {
+        accent_color: color,
+      };
+      if (color === 'custom' && customHex) {
+        update.custom_accent_color = customHex;
+      }
+
+      const { error } = await supabase.from('users').update(update).eq('id', userId);
+      if (error) {
+        console.error('Error saving accent color to profile:', error);
+      }
     } catch (error) {
       console.error('Error saving accent color preference:', error);
     }
@@ -187,8 +293,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         toggleDarkMode,
         colors,
         accentColor,
+        persistedAccentColor,
         customAccentColor,
         setAccentColor: handleSetAccentColor,
+        applyPersistedAccent,
+        applySessionBlue,
+        restorePersistedAccent,
       }}
     >
       {children}
@@ -202,4 +312,21 @@ export function useTheme() {
     throw new Error('useTheme must be used within a ThemeProvider');
   }
   return context;
+}
+
+/** Apply accent_color from the loaded user profile. Demo mode keeps its in-memory theme. */
+export function useSyncAccentFromProfile() {
+  const { userProfile } = useAuth();
+  const { applyPersistedAccent } = useTheme();
+
+  useEffect(() => {
+    if (isDemoMode()) return;
+    if (!userProfile?.accentColor) return;
+    applyPersistedAccent(userProfile.accentColor, userProfile.customAccentColor);
+  }, [
+    applyPersistedAccent,
+    userProfile?.accentColor,
+    userProfile?.customAccentColor,
+    userProfile?.id,
+  ]);
 } 
