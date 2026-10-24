@@ -1,5 +1,6 @@
 import { supabase, supabaseUrl } from '@/config/supabase';
 import { DEMO_FIRST_NAME, isDemoMode } from '@/utils/demoMode';
+import { markNewUserOnboarding } from '@/utils/onboardingState';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '@supabase/supabase-js';
 import { router } from 'expo-router';
@@ -25,7 +26,7 @@ interface AuthContextType {
   /** Same as !authReady during startup; kept for backward compatibility. Do not use for navigation—use authReady. */
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, firstName: string, dateOfBirth?: Date) => Promise<void>;
+  signUp: (email: string, password: string, firstName: string, dateOfBirth?: Date) => Promise<boolean>;
   logout: () => Promise<void>;
   deleteUserInfo: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -259,6 +260,22 @@ useEffect(() => {
       if (!authData.user) {
         throw new Error('Failed to create user');
       }
+
+      await markNewUserOnboarding(authData.user.id);
+      if (authData.session) {
+        let signedInUser = authData.user;
+        try {
+          const { data: updated } = await supabase.auth.updateUser({
+            data: { mm_onboarding: 'pending' },
+          });
+          if (updated.user) signedInUser = updated.user;
+        } catch (metadataError) {
+          if (__DEV__) {
+            console.warn('[onboarding] Could not mark new user metadata', metadataError);
+          }
+        }
+        setUser(signedInUser);
+      }
       
       // Create user profile using a database function (bypasses RLS)
       // This is a fallback in case the trigger doesn't fire
@@ -298,6 +315,7 @@ useEffect(() => {
           created_at: new Date().toISOString(),
         }));
       }
+      return Boolean(authData.session);
     } catch (error: any) {
       throw error;
     }
@@ -312,7 +330,7 @@ useEffect(() => {
         'lastHabitResetDate',
         'lastTaskCheck',
         'userProfile',
-        // Note: Don't clear theme preferences - users might want to keep those
+        // Theme preferences and per-account onboarding keys (mm.onboarding.v1.*) stay put.
       ]);
       
       // Sign out from Supabase

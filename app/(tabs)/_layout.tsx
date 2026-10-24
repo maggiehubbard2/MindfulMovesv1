@@ -1,4 +1,5 @@
 import { useAuth } from '@/context/AuthContext';
+import { useOnboarding } from '@/context/OnboardingContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router, Tabs } from 'expo-router';
 import React, { useEffect } from 'react';
@@ -12,6 +13,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 export default function TabLayout() {
   const { colors, isDarkMode } = useTheme();
   const { user, authReady } = useAuth();
+  const { phase } = useOnboarding();
   const colorScheme = useColorScheme();
   const navigationBackground = isDarkMode ? '#F2F2F7' : colors.card;
   const navigationBorder = isDarkMode ? '#C6C6C8' : colors.border;
@@ -27,8 +29,10 @@ export default function TabLayout() {
   useEffect(() => {
     if (authReady && !user) {
       router.replace('/login');
+    } else if (phase === 'onboarding') {
+      router.replace('/onboarding');
     }
-  }, [user, authReady]);
+  }, [user, authReady, phase]);
 
   if (!authReady) {
     return (

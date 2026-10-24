@@ -2,6 +2,7 @@ import DailyHabitList from '@/components/DailyHabitList';
 import DashboardSkeleton from '@/components/DashboardSkeleton';
 import ReminderCard from '@/components/ReminderCard';
 import ShareStreakScreen from '@/components/ShareStreakScreen';
+import WelcomeBackCard from '@/components/WelcomeBackCard';
 import WeeklyCalendar from '@/components/WeeklyCalendar';
 import { useAuth } from '@/context/AuthContext';
 import { useHabits } from '@/context/HabitsContext';
@@ -181,6 +182,8 @@ export default function DashboardScreen() {
               <Ionicons name="person" size={24} color={colors.primary} />
             </TouchableOpacity>
           </View>
+
+          <WelcomeBackCard />
 
           {/* Weekly Calendar */}
           <WeeklyCalendar onDatePress={handleDatePress} />

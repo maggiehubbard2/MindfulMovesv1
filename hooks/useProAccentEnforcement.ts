@@ -6,13 +6,19 @@ import { useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 
 /**
- * Custom is the only Pro-locked accent. After Pro status is known, a non-Pro
- * user keeps their saved custom color but sees blue for this session.
+ * Custom is the only Pro-locked accent. The alert waits until this account's
+ * profile accent and this account's RevenueCat customer have both loaded.
+ * A non-Pro user keeps the saved custom color but sees blue for this session.
  * Pink, green, and purple are left alone.
  */
 export function useProAccentEnforcement() {
-  const { isPro, isLoading, customerInfo } = useSubscription();
-  const { persistedAccentColor, applySessionBlue, restorePersistedAccent } = useTheme();
+  const { isPro, isLoading, identifiedUserId } = useSubscription();
+  const {
+    persistedAccentColor,
+    accentResolvedForUserId,
+    applySessionBlue,
+    restorePersistedAccent,
+  } = useTheme();
   const { user, userProfile } = useAuth();
   const isAdmin = userProfile?.isAdmin === true;
   const alertedForUserRef = useRef<string | null>(null);
@@ -21,7 +27,8 @@ export function useProAccentEnforcement() {
     if (isDemoMode()) return;
     const userId = user?.id;
     if (!userId) return;
-    if (isLoading || !customerInfo) return;
+    if (isLoading || identifiedUserId !== userId) return;
+    if (accentResolvedForUserId !== userId) return;
 
     if (isPro || isAdmin) {
       alertedForUserRef.current = null;
@@ -41,8 +48,9 @@ export function useProAccentEnforcement() {
       'The custom accent saved on your account is locked for Pro. Blue will be used until you subscribe.'
     );
   }, [
+    accentResolvedForUserId,
     applySessionBlue,
-    customerInfo,
+    identifiedUserId,
     isAdmin,
     isLoading,
     isPro,

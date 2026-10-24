@@ -1,11 +1,13 @@
 import '@/config/supabase'; // Initialize Supabase
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { HabitsProvider } from '@/context/HabitsContext';
+import { OnboardingProvider, useOnboarding } from '@/context/OnboardingContext';
 import { SubscriptionProvider } from '@/context/SubscriptionContext';
 import { ThemeProvider, useSyncAccentFromProfile } from '@/context/ThemeContext';
 import { useAppRefresh } from '@/hooks/useAppRefresh';
 import { useAppResumeAuth } from '@/hooks/useAppResumeAuth';
 import { useProAccentEnforcement } from '@/hooks/useProAccentEnforcement';
+import { getPostAuthHref } from '@/utils/authRoute';
 import { Image } from 'expo-image';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -21,6 +23,7 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
   const { authReady, user } = useAuth();
+  const { phase } = useOnboarding();
   const [showAnimatedSplash, setShowAnimatedSplash] = useState(true);
   const splashOpacity = useRef(new Animated.Value(1)).current;
   const hasHiddenNativeSplash = useRef(false);
@@ -37,19 +40,16 @@ function RootLayoutNav() {
     console.log('[COLD_START] redirect effect; authReady:', authReady);
     if (!authReady) return;
 
-    const firstSegment = segments[0];
-    const inLogin = firstSegment === 'login';
-    if (!user && !inLogin) {
-      console.log('redirecting to /login');
-      router.replace('/login');
-      return;
+    const href = getPostAuthHref({
+      hasUser: Boolean(user),
+      phase,
+      segment: segments[0],
+    });
+    if (href) {
+      console.log('redirecting to', href);
+      router.replace(href);
     }
-
-    if (user && (inLogin || !firstSegment)) {
-      console.log('redirecting to /dashboard');
-      router.replace('/dashboard');
-    }
-  }, [user, authReady, segments, router]);
+  }, [user, authReady, segments, router, phase]);
 
   useEffect(() => {
     if (authReady && !isNavigationReady) {
@@ -106,6 +106,7 @@ function RootLayoutNav() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen
             name="addhabit"
             options={{ headerShown: false, presentation: 'modal' }}
@@ -151,7 +152,9 @@ export default function RootLayout() {
       <ThemeProvider>
         <SubscriptionProvider>
           <HabitsProvider>
-            <RootLayoutNav />
+            <OnboardingProvider>
+              <RootLayoutNav />
+            </OnboardingProvider>
           </HabitsProvider>
         </SubscriptionProvider>
       </ThemeProvider>
