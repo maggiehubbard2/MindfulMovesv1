@@ -4,7 +4,6 @@ import { useTheme } from '@/context/ThemeContext';
 import { getRandomQuote } from '@/utils/quoteUtils';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -130,13 +129,17 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       if (isSignUp) {       
-        await signUp(email, password, firstName, dateOfBirth || undefined);
-        Alert.alert('Success', 'Account created successfully!');
-        router.replace('/(tabs)/dashboard');
+        const signedIn = await signUp(email, password, firstName, dateOfBirth || undefined);
+        if (!signedIn) {
+          Alert.alert('Account created', 'Check your email to confirm your account, then sign in.');
+          setIsSignUp(false);
+          setLoading(false);
+        }
       } else {
         await signIn(email, password);
-        router.replace('/(tabs)/dashboard');
       }
+      // Root navigation waits until onboarding state is resolved, then routes
+      // new accounts to onboarding and everyone else to the dashboard.
     } catch (error: any) {
       // Handle specific Supabase errors
       let errorMessage = 'Authentication failed';
@@ -157,7 +160,6 @@ export default function LoginScreen() {
       }
       
       Alert.alert('Error', errorMessage);
-    } finally {
       setLoading(false);
     }
   };

@@ -26,6 +26,11 @@ import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
 interface SubscriptionContextType {
   isConfigured: boolean;
   isLoading: boolean;
+  /**
+   * Supabase user id whose RevenueCat customer has finished loading.
+   * Null while the anonymous customer, or a previous account, is still current.
+   */
+  identifiedUserId: string | null;
   isPro: boolean;
   customerInfo: CustomerInfo | null;
   offerings: PurchasesOfferings | null;
@@ -56,10 +61,22 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const { user, authReady } = useAuth();
   const [isConfigured, setIsConfigured] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [identifiedUserId, setIdentifiedUserId] = useState<string | null>(null);
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [offerings, setOfferings] = useState<PurchasesOfferings | null>(null);
   const configuredRef = useRef(false);
   const lastAppUserIdRef = useRef<string | null>(null);
+  const authUserId = user?.id ?? null;
+  const [trackedAuthUserId, setTrackedAuthUserId] = useState<string | null>(authUserId);
+
+  // Drop the previous customer's Pro status in this render, before child effects
+  // can treat an anonymous or previous RevenueCat customer as this account.
+  if (authUserId !== trackedAuthUserId) {
+    setTrackedAuthUserId(authUserId);
+    setIdentifiedUserId(null);
+    setCustomerInfo(null);
+    setIsLoading(true);
+  }
 
   const refreshCustomerInfo = useCallback(async (): Promise<CustomerInfo | null> => {
     try {
@@ -121,25 +138,41 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
   // Identify user with Supabase id; reset on logout
   useEffect(() => {
-    if (!authReady || !isConfigured) return;
+    if (!authReady) return;
 
+    const native = Platform.OS === 'ios' || Platform.OS === 'android';
+    if (!native) {
+      setIdentifiedUserId(authUserId);
+      setIsLoading(false);
+      return;
+    }
+
+    if (!isConfigured) return;
+
+    let cancelled = false;
     const syncIdentity = async () => {
       try {
         setIsLoading(true);
 
-        if (user?.id) {
-          if (lastAppUserIdRef.current !== user.id) {
-            const { customerInfo: info } = await Purchases.logIn(user.id);
-            lastAppUserIdRef.current = user.id;
+        if (authUserId) {
+          if (lastAppUserIdRef.current !== authUserId) {
+            const { customerInfo: info } = await Purchases.logIn(authUserId);
+            if (cancelled) return;
+            lastAppUserIdRef.current = authUserId;
             setCustomerInfo(info);
           } else {
-            await refreshCustomerInfo();
+            const info = await refreshCustomerInfo();
+            if (cancelled || !info) return;
           }
+          if (cancelled) return;
+          setIdentifiedUserId(authUserId);
           await refreshOfferings();
         } else if (lastAppUserIdRef.current) {
           const info = await Purchases.logOut();
+          if (cancelled) return;
           lastAppUserIdRef.current = null;
           setCustomerInfo(info);
+          setIdentifiedUserId(null);
           setOfferings(null);
         } else {
           await refreshCustomerInfo();
@@ -150,12 +183,15 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           console.warn('[RevenueCat] identity sync failed:', getErrorMessage(error));
         }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     void syncIdentity();
-  }, [authReady, isConfigured, user?.id, refreshCustomerInfo, refreshOfferings]);
+    return () => {
+      cancelled = true;
+    };
+  }, [authReady, isConfigured, authUserId, refreshCustomerInfo, refreshOfferings]);
 
   const presentPaywall = useCallback(async (): Promise<boolean> => {
     if (!isConfigured) {
@@ -282,6 +318,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     () => ({
       isConfigured,
       isLoading,
+      identifiedUserId,
       isPro: hasProEntitlement(customerInfo),
       customerInfo,
       offerings,
@@ -296,6 +333,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     [
       isConfigured,
       isLoading,
+      identifiedUserId,
       customerInfo,
       offerings,
       refreshCustomerInfo,

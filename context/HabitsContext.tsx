@@ -27,6 +27,9 @@ interface HabitsContextType {
   selectedDate: Date;
   setSelectedDate: (date: Date) => void;
   addHabit: (name: string, description?: string) => Promise<void>;
+  addHabits: (
+    items: { name: string; description?: string }[],
+  ) => Promise<{ added: number; blockedByLimit: boolean }>;
   updateHabit: (id: string, name: string, description?: string) => Promise<void>;
   toggleHabit: (id: string, date?: Date) => Promise<void>;
   removeHabit: (id: string) => Promise<void>;
@@ -442,6 +445,123 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const addHabits = async (
+    items: { name: string; description?: string }[],
+  ): Promise<{ added: number; blockedByLimit: boolean }> => {
+    if (!user || items.length === 0) {
+      return { added: 0, blockedByLimit: false };
+    }
+
+    const isAdmin = userProfile?.isAdmin === true;
+    const seen = new Set(habits.map((habit) => habit.name.trim().toLowerCase()));
+    const accepted: { name: string; description?: string }[] = [];
+    let blockedByLimit = false;
+
+    for (const item of items) {
+      const name = item.name.trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      if (!isDemoMode() && !canAddHabit(isPro, habits.length + accepted.length, isAdmin)) {
+        blockedByLimit = true;
+        break;
+      }
+      seen.add(key);
+      const description = item.description?.trim();
+      accepted.push({ name, description: description || undefined });
+    }
+
+    if (accepted.length === 0) {
+      if (blockedByLimit) {
+        Alert.alert(
+          'Habit limit reached',
+          `Free accounts can track up to ${FREE_HABIT_LIMIT} habits. Upgrade to Pro for unlimited habits.`,
+        );
+      }
+      return { added: 0, blockedByLimit };
+    }
+
+    const created: Habit[] = [];
+
+    if (isDemoMode()) {
+      accepted.forEach((item, index) => {
+        created.push({
+          id: `demo-${Date.now()}-${index}`,
+          name: item.name,
+          description: item.description,
+          completed: false,
+          userId: user.id,
+          createdAt: new Date(),
+          completionDates: [],
+        });
+      });
+      setHabits([...habits, ...created]);
+      return { added: created.length, blockedByLimit: false };
+    }
+
+    try {
+      const rows = accepted.map((item) => ({
+        name: item.name,
+        description: item.description || null,
+        completed: false,
+        user_id: user.id,
+        created_at: new Date().toISOString(),
+        completion_dates: [] as string[],
+      }));
+      const { data, error } = await supabase.from('habit').insert(rows).select();
+      if (error) throw error;
+
+      for (const row of data || []) {
+        created.push({
+          id: row.id,
+          name: row.name,
+          description: row.description || undefined,
+          completed: row.completed,
+          userId: row.user_id,
+          createdAt: new Date(row.created_at),
+          completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
+          completionDates: row.completion_dates || [],
+        });
+      }
+    } catch (error) {
+      console.error('Error adding habits to Supabase:', error);
+      const now = Date.now();
+      accepted.forEach((item, index) => {
+        created.push({
+          id: `${now + index}`,
+          name: item.name,
+          description: item.description,
+          completed: false,
+          userId: user.id,
+          createdAt: new Date(),
+          completionDates: [],
+        });
+      });
+    }
+
+    if (created.length === 0) {
+      return { added: 0, blockedByLimit };
+    }
+
+    const newHabits = [...habits, ...created];
+    setHabits(newHabits);
+
+    try {
+      const currentOrder = await AsyncStorage.getItem('habitOrder').then(
+        (val) => (val ? JSON.parse(val) : habits.map((habit) => habit.id)),
+      ).catch(() => habits.map((habit) => habit.id));
+      const newOrder = [...currentOrder, ...created.map((habit) => habit.id)];
+      await Promise.all([
+        AsyncStorage.setItem('habits', JSON.stringify(newHabits)),
+        AsyncStorage.setItem('habitOrder', JSON.stringify(newOrder)),
+      ]);
+    } catch (error) {
+      console.error('Error caching new habits:', error);
+    }
+
+    return { added: created.length, blockedByLimit: false };
+  };
+
   const updateHabit = async (id: string, name: string, description?: string) => {
     const habitToUpdate = habits.find(habit => habit.id === id);
     if (!habitToUpdate) return;
@@ -660,7 +780,8 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       habits, 
       selectedDate,
       setSelectedDate,
-      addHabit, 
+      addHabit,
+      addHabits,
       updateHabit, 
       toggleHabit, 
       removeHabit,
