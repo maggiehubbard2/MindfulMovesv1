@@ -14,6 +14,8 @@ interface UserProfile {
   dateOfBirth?: string; // ISO date string (YYYY-MM-DD)
   created_at: string;
   isAdmin?: boolean;
+  /** True or false once the users row has been read. Unset until then, including on an older cache. */
+  isPremium?: boolean;
   accentColor?: string;
   customAccentColor?: string;
 }
@@ -86,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           dateOfBirth: data.date_of_birth || undefined,
           created_at: data.created_at,
           isAdmin: data.is_admin,
+          isPremium: typeof data.is_premium === 'boolean' ? data.is_premium : undefined,
           accentColor: data.accent_color ?? undefined,
           customAccentColor: data.custom_accent_color ?? undefined,
         };

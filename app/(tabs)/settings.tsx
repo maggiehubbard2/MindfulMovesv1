@@ -10,7 +10,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -64,10 +64,13 @@ export default function SettingsScreen() {
     restorePurchases,
   } = useSubscription();
   const isAdmin = userProfile?.isAdmin === true;
-  const hasUnlimitedColors = isPro || isAdmin || isDemoMode();
+  const isPremium = userProfile?.isPremium === true;
+  const hasUnlimitedColors = isPro || isAdmin || isPremium || isDemoMode();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const { openSubscription } = useLocalSearchParams<{ openSubscription?: string | string[] }>();
+  const openSubscriptionParam = Array.isArray(openSubscription) ? openSubscription[0] : openSubscription;
   const pendingSubscriptionAction = useRef<(() => void) | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [tempCustomColor, setTempCustomColor] = useState(customAccentColor);
@@ -77,6 +80,12 @@ export default function SettingsScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isLoadingReminderTime, setIsLoadingReminderTime] = useState(true);
   const [pendingTimeUpdate, setPendingTimeUpdate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    if (openSubscriptionParam !== '1') return;
+    setShowSubscriptionModal(true);
+    router.setParams({ openSubscription: '' });
+  }, [openSubscriptionParam]);
 
   // Load reminder time from database (with local cache fallback)
   useEffect(() => {

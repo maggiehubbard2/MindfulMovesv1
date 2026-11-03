@@ -6,10 +6,9 @@ import { useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 
 /**
- * Custom is the only Pro-locked accent. The alert waits until this account's
- * profile accent and this account's RevenueCat customer have both loaded.
- * A non-Pro user keeps the saved custom color but sees blue for this session.
- * Pink, green, and purple are left alone.
+ * Custom is the only Pro-locked accent. Blue, pink, green, and purple stay as saved.
+ * A database-premium or admin account keeps custom as soon as the profile accent is known.
+ * Otherwise custom waits for this account's RevenueCat customer, and a non-Pro user sees blue.
  */
 export function useProAccentEnforcement() {
   const { isPro, isLoading, identifiedUserId } = useSubscription();
@@ -20,25 +19,34 @@ export function useProAccentEnforcement() {
     restorePersistedAccent,
   } = useTheme();
   const { user, userProfile } = useAuth();
-  const isAdmin = userProfile?.isAdmin === true;
   const alertedForUserRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (isDemoMode()) return;
     const userId = user?.id;
     if (!userId) return;
-    if (isLoading || identifiedUserId !== userId) return;
     if (accentResolvedForUserId !== userId) return;
+    if (persistedAccentColor !== 'custom') return;
 
-    if (isPro || isAdmin) {
+    const profile = userProfile?.id === userId ? userProfile : undefined;
+    const isAdmin = profile?.isAdmin === true;
+    const isPremium = profile?.isPremium;
+
+    if (isPremium === true || isAdmin) {
       alertedForUserRef.current = null;
-      if (persistedAccentColor === 'custom') {
-        restorePersistedAccent();
-      }
+      restorePersistedAccent();
       return;
     }
 
-    if (persistedAccentColor !== 'custom') return;
+    // Missing flag means the users row has not been read yet. Do not force blue.
+    if (isPremium !== false) return;
+    if (isLoading || identifiedUserId !== userId) return;
+
+    if (isPro) {
+      alertedForUserRef.current = null;
+      restorePersistedAccent();
+      return;
+    }
 
     applySessionBlue();
     if (alertedForUserRef.current === userId) return;
@@ -51,11 +59,11 @@ export function useProAccentEnforcement() {
     accentResolvedForUserId,
     applySessionBlue,
     identifiedUserId,
-    isAdmin,
     isLoading,
     isPro,
     persistedAccentColor,
     restorePersistedAccent,
     user?.id,
+    userProfile,
   ]);
 }
