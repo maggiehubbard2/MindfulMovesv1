@@ -3,7 +3,9 @@ import {
   REVENUECAT_ANDROID_API_KEY,
   REVENUECAT_IOS_API_KEY,
 } from '@/config/revenuecat';
+import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { router } from 'expo-router';
 import React, {
   createContext,
   useCallback,
@@ -57,8 +59,75 @@ function getErrorMessage(error: unknown): string {
   return 'Something went wrong. Please try again.';
 }
 
+function alertPremiumChange(isPremium: boolean) {
+  if (isPremium) {
+    Alert.alert('Mindful Moves Pro', 'Your Pro benefits are now available.');
+    return;
+  }
+
+  Alert.alert(
+    'Pro benefits ended',
+    'Your subscription is no longer active, so Pro benefits have been removed.',
+    [
+      { text: 'Not now', style: 'cancel' },
+      {
+        text: 'View subscription',
+        onPress: () => {
+          router.push('/(tabs)/settings?openSubscription=1');
+        },
+      },
+    ]
+  );
+}
+
+/** Write is_premium from a loaded customer. Leave the column alone when the read or update fails. */
+async function persistPremiumFromCustomerInfo(
+  userId: string,
+  info: CustomerInfo,
+  refreshUserProfile: () => Promise<void>,
+  stillCurrent: () => boolean
+) {
+  const isPremium = hasProEntitlement(info);
+  const { data, error: readError } = await supabase
+    .from('users')
+    .select('is_premium, is_admin')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (readError || !stillCurrent()) {
+    if (readError && __DEV__) {
+      console.warn('[RevenueCat] Could not read is_premium:', readError.message);
+    }
+    return;
+  }
+
+  // Admins keep access without a RevenueCat entitlement, so do not overwrite is_premium or alert.
+  if (data?.is_admin === true) return;
+
+  const previous = data?.is_premium;
+  if (previous === isPremium) return;
+
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({ is_premium: isPremium })
+    .eq('id', userId);
+
+  if (updateError || !stillCurrent()) {
+    if (updateError && __DEV__) {
+      console.warn('[RevenueCat] Could not update is_premium:', updateError.message);
+    }
+    return;
+  }
+
+  await refreshUserProfile();
+  if (!stillCurrent()) return;
+  if (typeof previous === 'boolean') {
+    alertPremiumChange(isPremium);
+  }
+}
+
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
-  const { user, authReady } = useAuth();
+  const { user, authReady, refreshUserProfile } = useAuth();
   const [isConfigured, setIsConfigured] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [identifiedUserId, setIdentifiedUserId] = useState<string | null>(null);
@@ -66,7 +135,29 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const [offerings, setOfferings] = useState<PurchasesOfferings | null>(null);
   const configuredRef = useRef(false);
   const lastAppUserIdRef = useRef<string | null>(null);
+  const premiumSyncChain = useRef(Promise.resolve());
+  const refreshUserProfileRef = useRef(refreshUserProfile);
+  refreshUserProfileRef.current = refreshUserProfile;
   const authUserId = user?.id ?? null;
+  const authUserIdRef = useRef(authUserId);
+  authUserIdRef.current = authUserId;
+
+  const syncPremiumColumn = useCallback((userId: string, info: CustomerInfo) => {
+    premiumSyncChain.current = premiumSyncChain.current
+      .then(() =>
+        persistPremiumFromCustomerInfo(
+          userId,
+          info,
+          () => refreshUserProfileRef.current(),
+          () => authUserIdRef.current === userId
+        )
+      )
+      .catch((error) => {
+        if (__DEV__) {
+          console.warn('[RevenueCat] premium sync failed:', getErrorMessage(error));
+        }
+      });
+  }, []);
   const [trackedAuthUserId, setTrackedAuthUserId] = useState<string | null>(authUserId);
 
   // Drop the previous customer's Pro status in this render, before child effects
@@ -125,6 +216,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
         Purchases.addCustomerInfoUpdateListener((info) => {
           setCustomerInfo(info);
+          const userId = lastAppUserIdRef.current;
+          if (userId && userId === authUserIdRef.current) {
+            syncPremiumColumn(userId, info);
+          }
         });
       } catch (error) {
         console.error('[RevenueCat] configure failed:', getErrorMessage(error));
@@ -134,7 +229,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     };
 
     void configure();
-  }, []);
+  }, [syncPremiumColumn]);
 
   // Identify user with Supabase id; reset on logout
   useEffect(() => {
@@ -160,17 +255,19 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
             if (cancelled) return;
             lastAppUserIdRef.current = authUserId;
             setCustomerInfo(info);
+            syncPremiumColumn(authUserId, info);
           } else {
             const info = await refreshCustomerInfo();
             if (cancelled || !info) return;
+            syncPremiumColumn(authUserId, info);
           }
           if (cancelled) return;
           setIdentifiedUserId(authUserId);
           await refreshOfferings();
         } else if (lastAppUserIdRef.current) {
+          lastAppUserIdRef.current = null;
           const info = await Purchases.logOut();
           if (cancelled) return;
-          lastAppUserIdRef.current = null;
           setCustomerInfo(info);
           setIdentifiedUserId(null);
           setOfferings(null);
@@ -191,7 +288,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     return () => {
       cancelled = true;
     };
-  }, [authReady, isConfigured, authUserId, refreshCustomerInfo, refreshOfferings]);
+  }, [authReady, isConfigured, authUserId, refreshCustomerInfo, refreshOfferings, syncPremiumColumn]);
 
   const presentPaywall = useCallback(async (): Promise<boolean> => {
     if (!isConfigured) {
