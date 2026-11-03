@@ -64,7 +64,8 @@ export default function SettingsScreen() {
     restorePurchases,
   } = useSubscription();
   const isAdmin = userProfile?.isAdmin === true;
-  const hasUnlimitedColors = isPro || isAdmin || isDemoMode();
+  const isPremium = userProfile?.isPremium === true;
+  const hasUnlimitedColors = isPro || isAdmin || isPremium || isDemoMode();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
