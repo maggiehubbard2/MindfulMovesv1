@@ -1,23 +1,10 @@
-import { supabase } from '@/config/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { ensureReminderPreferences, setDailyRemindersEnabled } from '@/utils/reminderNotifications';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import * as Notifications from 'expo-notifications';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
-// Configure notification handler
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+import React, { useCallback, useState } from 'react';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface ReminderCardProps {
   onSetReminder?: () => void;
@@ -26,210 +13,60 @@ interface ReminderCardProps {
 export default function ReminderCard({ onSetReminder }: ReminderCardProps) {
   const { colors } = useTheme();
   const { user } = useAuth();
-  const [isReminderSet, setIsReminderSet] = useState(false);
-  const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
-  const [reminderTime, setReminderTime] = useState<{ hour: number; minute: number }>({ hour: 8, minute: 0 });
+  const [visible, setVisible] = useState(false);
 
-  useEffect(() => {
-    // Register for push notifications
-    registerForPushNotificationsAsync().then(token => setExpoPushToken(token));
-
-    // Load from cache first for instant UI
-    const loadCached = async () => {
-      const cached = await AsyncStorage.getItem('reminderTime');
-      if (cached) {
-        const [hours, minutes] = cached.split(':').map(Number);
-        setReminderTime({ hour: hours, minute: minutes });
-      }
-    };
-    loadCached();
-
-    // Then fetch fresh from database (non-blocking)
-    if (user) {
-      if (typeof requestIdleCallback !== 'undefined') {
-        requestIdleCallback(() => loadReminderTimeFromDb());
-      } else {
-        setTimeout(() => loadReminderTimeFromDb(), 0);
-      }
-    }
-  }, [user]);
-
-  // Re-check notification status when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      checkExistingNotifications();
-    }, [])
-  );
-
-  const loadReminderTimeFromDb = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('reminder_time')
-        .eq('id', user.id)
-        .single();
-
-      if (error) {
-        if (error.code === '42703' || error.code === 'PGRST204') return;
-        throw error;
-      }
-
-      if (data?.reminder_time) {
-        const [hours, minutes] = data.reminder_time.split(':').map(Number);
-        setReminderTime({ hour: hours, minute: minutes });
-        await AsyncStorage.setItem('reminderTime', data.reminder_time);
-      }
-    } catch (error: any) {
-      if (error?.code !== '42703' && error?.code !== 'PGRST204') {
-        console.error('Error loading reminder time:', error);
-      }
-    }
-  };
-
-  const formatTime = (hour: number, minute: number): string => {
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHours = hour % 12 || 12;
-    const displayMinutes = minute.toString().padStart(2, '0');
-    return `${displayHours}:${displayMinutes} ${ampm}`;
-  };
-
-  const checkExistingNotifications = async () => {
-    const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
-    const hasReminder = scheduledNotifications.some(
-      notification => notification.identifier === 'daily-habit-reminder'
-    );
-    setIsReminderSet(hasReminder);
-  };
-
-  const registerForPushNotificationsAsync = async () => {
-    let token;
-
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
-    }
-
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    
-    if (finalStatus !== 'granted') {
-      Alert.alert(
-        'Permission Required',
-        'Please enable notifications in your device settings to receive reminders.',
-        [{ text: 'OK' }]
-      );
-      return null;
-    }
-    
-    token = (await Notifications.getExpoPushTokenAsync()).data;
-    return token;
-  };
-
-  const handleSetReminder = async () => {
-    try {
-      // Request permissions first
-      const { status } = await Notifications.requestPermissionsAsync();
-      
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission Denied',
-          'Notifications permission is required to set reminders. Please enable it in your device settings.',
-          [{ text: 'OK' }]
-        );
+      if (!user) {
+        setVisible(false);
         return;
       }
-
-      // Cancel existing reminder if any
-      await Notifications.cancelScheduledNotificationAsync('daily-habit-reminder');
-
-      // Schedule daily reminder at the saved time (or default 8:00 AM)
-      const trigger: Notifications.DailyTriggerInput = {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: reminderTime.hour,
-        minute: reminderTime.minute,
+      let cancelled = false;
+      ensureReminderPreferences(user.id)
+        .then((prefs) => {
+          if (!cancelled) setVisible(!prefs.remindersEnabled);
+        })
+        .catch(() => {
+          if (!cancelled) setVisible(false);
+        });
+      return () => {
+        cancelled = true;
       };
+    }, [user]),
+  );
 
-      await Notifications.scheduleNotificationAsync({
-        identifier: 'daily-habit-reminder',
-        content: {
-          title: 'Time for your habits! 🌟',
-          body: 'Don\'t forget to complete your daily habits!',
-          sound: true,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-        },
-        trigger,
-      });
-
-      setIsReminderSet(true);
-      const timeString = formatTime(reminderTime.hour, reminderTime.minute);
+  const handleSetReminder = async () => {
+    if (!user) return;
+    const result = await setDailyRemindersEnabled(user.id, true);
+    if (!result.ok) {
       Alert.alert(
-        'Reminder Set!',
-        `You'll receive a daily reminder at ${timeString} to complete your habits. You can change this time in Settings.`,
-        [{ text: 'OK' }]
+        'Permission needed',
+        'Notifications need to be allowed before Daily Reminders can be turned on.',
       );
-      onSetReminder?.();
-    } catch (error) {
-      console.error('Error setting reminder:', error);
-      Alert.alert(
-        'Error',
-        'Failed to set reminder. Please try again.',
-        [{ text: 'OK' }]
-      );
+      return;
     }
+    setVisible(false);
+    Alert.alert(
+      'Daily reminders on',
+      'You\'ll get a nudge at 9:00 AM, 2:00 PM, and 8:00 PM. You can add an extra reminder in Settings.',
+    );
+    onSetReminder?.();
   };
 
-  const handleCancelReminder = async () => {
-    try {
-      await Notifications.cancelScheduledNotificationAsync('daily-habit-reminder');
-      setIsReminderSet(false);
-      Alert.alert(
-        'Reminder Cancelled',
-        'Your daily reminder has been cancelled.',
-        [{ text: 'OK' }]
-      );
-    } catch (error) {
-      console.error('Error cancelling reminder:', error);
-    }
-  };
-
-  // Hide the card if reminder is already active
-  if (isReminderSet) {
-    return null;
-  }
+  if (!visible) return null;
 
   return (
-    <View style={[
-      styles.container,
-      { 
-        backgroundColor: colors.primary + '15', // 15% opacity version of primary
-      }
-    ]}>
+    <View style={[styles.container, { backgroundColor: colors.primary + '15' }]}>
       <View style={styles.content}>
         <View style={styles.textContainer}>
-          <Text style={[styles.title, { color: colors.text }]}>
-            {isReminderSet ? 'Reminder Active' : 'Set the reminder'}
-          </Text>
+          <Text style={[styles.title, { color: colors.text }]}>Daily reminders</Text>
           <Text style={[styles.description, { color: colors.secondary }]}>
-            {isReminderSet 
-              ? `You'll receive a daily reminder at ${formatTime(reminderTime.hour, reminderTime.minute)} to complete your habits.`
-              : 'Never miss your morning routine! Set a reminder to stay on track'}
+            Get reminders to check in with your habits.
           </Text>
         </View>
-        
+
         <View style={styles.iconContainer}>
           <Ionicons name="notifications" size={48} color={colors.primary} />
-          {/* Sound waves effect */}
           <View style={styles.soundWaves}>
             <View style={[styles.wave, { borderColor: colors.primary }]} />
             <View style={[styles.wave, styles.wave2, { borderColor: colors.primary }]} />
@@ -239,24 +76,12 @@ export default function ReminderCard({ onSetReminder }: ReminderCardProps) {
       </View>
 
       <TouchableOpacity
-        style={[
-          styles.button, 
-          { 
-            backgroundColor: isReminderSet ? colors.border : colors.primary 
-          }
-        ]}
-        onPress={isReminderSet ? handleCancelReminder : handleSetReminder}
+        style={[styles.button, { backgroundColor: colors.primary }]}
+        onPress={handleSetReminder}
         activeOpacity={0.8}
       >
-        <Ionicons 
-          name={isReminderSet ? "checkmark-circle" : "notifications-outline"} 
-          size={20} 
-          color="white" 
-          style={styles.buttonIcon}
-        />
-        <Text style={styles.buttonText}>
-          {isReminderSet ? 'Reminder Set' : 'Set Now'}
-        </Text>
+        <Ionicons name="notifications-outline" size={20} color="white" style={styles.buttonIcon} />
+        <Text style={styles.buttonText}>Turn on</Text>
       </TouchableOpacity>
     </View>
   );
@@ -269,10 +94,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
@@ -339,10 +161,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
@@ -356,4 +175,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
