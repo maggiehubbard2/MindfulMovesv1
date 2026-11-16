@@ -23,7 +23,7 @@ interface DailyHabitListProps {
 const listMoveTransition = LinearTransition.easing(Easing.out(Easing.cubic)).duration(900);
 
 export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitListProps) {
-  const { selectedDate, getHabitsForDate, toggleHabit, canEditDate } = useHabits();
+  const { selectedDate, getHabitsForDate, toggleHabit, canEditDate, goToToday } = useHabits();
   const { colors } = useTheme();
   const [pendingCompletedIds, setPendingCompletedIds] = useState<Set<string>>(new Set());
   
@@ -144,23 +144,30 @@ export default function DailyHabitList({ onHabitToggle, maxItems }: DailyHabitLi
     );
   }
 
-const isToday = selectedDate
-  ? selectedDate.toDateString() === new Date().toDateString()
-  : false;
+  const isToday = selectedDate
+    ? selectedDate.toDateString() === new Date().toDateString()
+    : false;
 
-const weekday = !selectedDate
-  ? 'Daily'
-  : isToday
-  ? 'Today\'s'
-  : selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
-
-
+  const weekday = !selectedDate
+    ? 'Daily'
+    : isToday
+    ? 'Today\'s'
+    : selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
 
   return (
     <View style={styles.container}>
       {/* Section Header */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{weekday} Habits</Text>
+        <TouchableOpacity
+          onPress={goToToday}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Go to today"
+          style={[styles.todayButton, { backgroundColor: colors.primary }]}
+        >
+          <Text style={styles.todayButtonText}>Today</Text>
+        </TouchableOpacity>
         {hasMore && (
           <TouchableOpacity onPress={() => router.push('/(tabs)/habits')}>
             <Text style={[styles.seeAllText, { color: colors.primary }]}>See all</Text>
@@ -386,6 +393,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     paddingHorizontal: 20,
+  },
+  todayButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  todayButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: 'white',
   },
   sectionTitle: {
     fontSize: 20,
