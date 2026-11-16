@@ -4,12 +4,22 @@ import { useTheme } from '@/context/ThemeContext';
 import { getRandomQuote } from '@/utils/quoteUtils';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { StatusBar } from 'expo-status-bar';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
-  const { colors } = useTheme();
+  const { colors: themeColors } = useTheme();
+  // Login stays on the light palette even when the app theme is dark.
+  const colors = {
+    background: '#FFFFFF',
+    card: '#F2F2F7',
+    text: '#000000',
+    border: '#C6C6C8',
+    primary: themeColors.primary,
+    secondary: themeColors.secondary,
+  };
   const { signIn, signUp, resetPassword, authReady } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -168,6 +178,7 @@ export default function LoginScreen() {
   if (!authReady) {
     return (
       <SafeAreaView style={[styles.loadingContainer, { backgroundColor: colors.background }]} edges={['top']}>
+        <StatusBar style="dark" />
         <View style={styles.loadingContent}>
           <Quote text={loadingQuote.text} author={loadingQuote.author} />
           <View style={styles.loadingIndicator}>
@@ -183,6 +194,7 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <StatusBar style="dark" />
       <KeyboardAvoidingView 
         style={styles.keyboardView} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
