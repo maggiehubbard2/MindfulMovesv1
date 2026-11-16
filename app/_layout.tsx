@@ -7,6 +7,7 @@ import { ThemeProvider, useSyncAccentFromProfile } from '@/context/ThemeContext'
 import { useAppRefresh } from '@/hooks/useAppRefresh';
 import { useAppResumeAuth } from '@/hooks/useAppResumeAuth';
 import { useProAccentEnforcement } from '@/hooks/useProAccentEnforcement';
+import { useReminderSync } from '@/hooks/useReminderSync';
 import { getPostAuthHref } from '@/utils/authRoute';
 import { Image } from 'expo-image';
 import { Stack, useRouter, useSegments } from 'expo-router';
@@ -33,6 +34,7 @@ function RootLayoutNav() {
   useAppResumeAuth();
   useSyncAccentFromProfile();
   useProAccentEnforcement();
+  useReminderSync();
 
   const isNavigationReady = segments.length > 0;
 

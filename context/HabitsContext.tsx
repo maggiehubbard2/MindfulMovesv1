@@ -26,6 +26,9 @@ interface HabitsContextType {
   habits: Habit[];
   selectedDate: Date;
   setSelectedDate: (date: Date) => void;
+  goToToday: () => void;
+  /** Increments each time today is requested, so the week strip can follow. */
+  focusTodayNonce: number;
   addHabit: (name: string, description?: string) => Promise<void>;
   addHabits: (
     items: { name: string; description?: string }[],
@@ -47,6 +50,7 @@ const HabitsContext = createContext<HabitsContextType | undefined>(undefined);
 export function HabitsProvider({ children }: { children: React.ReactNode }) {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [focusTodayNonce, setFocusTodayNonce] = useState(0);
   const { user, userProfile } = useAuth();
   const { isPro } = useSubscription();
   const hasHydratedRef = React.useRef(false);
@@ -61,6 +65,7 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     setSelectedDate(today);
+    setFocusTodayNonce((n) => n + 1);
   }, []);
 
   // Load habits from Supabase when user is authenticated
@@ -780,6 +785,8 @@ export function HabitsProvider({ children }: { children: React.ReactNode }) {
       habits, 
       selectedDate,
       setSelectedDate,
+      goToToday,
+      focusTodayNonce,
       addHabit,
       addHabits,
       updateHabit, 

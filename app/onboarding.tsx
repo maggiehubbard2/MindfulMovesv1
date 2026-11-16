@@ -326,7 +326,7 @@ export default function OnboardingScreen() {
               <Text style={[styles.support, { color: colors.secondary }]}>
                 {selected.length === 0
                   ? 'Nothing selected yet. Go back to choose a habit, or start with an empty dashboard.'
-                  : 'These are ready to save. You can set a reminder later in Settings.'}
+                  : 'These are ready to save. You can turn on daily reminders later in Settings.'}
               </Text>
               {selected.map((habit) => (
                 <View

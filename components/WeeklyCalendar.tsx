@@ -2,7 +2,7 @@ import { useHabits } from '@/context/HabitsContext';
 import { useTheme } from '@/context/ThemeContext';
 import { getWeekStartSunday } from '@/utils/date';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface WeeklyCalendarProps {
@@ -11,7 +11,7 @@ interface WeeklyCalendarProps {
 
 export default function WeeklyCalendar({ onDatePress }: WeeklyCalendarProps) {
   const { colors } = useTheme();
-  const { selectedDate } = useHabits();
+  const { selectedDate, focusTodayNonce } = useHabits();
   const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStartSunday(new Date()));
 
   const getWeekDates = (weekStart: Date): Date[] => {
@@ -43,6 +43,11 @@ export default function WeeklyCalendar({ onDatePress }: WeeklyCalendarProps) {
   const goToCurrentWeek = () => {
     setCurrentWeekStart(getWeekStartSunday(new Date()));
   };
+
+  useEffect(() => {
+    if (focusTodayNonce === 0) return;
+    setCurrentWeekStart(getWeekStartSunday(new Date()));
+  }, [focusTodayNonce]);
 
   const isToday = (date: Date) => {
     const today = new Date();
